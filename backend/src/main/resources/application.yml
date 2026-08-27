@@ -6,9 +6,10 @@ spring:
   application:
     name: farm-to-home-api
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5434/farm_to_home}
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:root}
+    url: ${SPRING_DATASOURCE_URL:${DB_URL:${DATABASE_URL:${DATABASE_PUBLIC_URL:jdbc:postgresql://localhost:5434/farm_to_home}}}}
+    username: ${SPRING_DATASOURCE_USERNAME:${DB_USERNAME:${PGUSER:${POSTGRES_USER:postgres}}}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD:${PGPASSWORD:${POSTGRES_PASSWORD:root}}}}
+    driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: ${DB_POOL_SIZE:10}
       minimum-idle: 2
