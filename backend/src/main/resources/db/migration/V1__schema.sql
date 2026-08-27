@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS products (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE products ADD COLUMN IF NOT EXISTS category varchar(80) NOT NULL DEFAULT 'vegetables';
 CREATE INDEX IF NOT EXISTS idx_products_category_active ON products(category, active);
 
 CREATE TABLE IF NOT EXISTS coupons (

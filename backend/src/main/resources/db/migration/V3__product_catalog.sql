@@ -1,3 +1,43 @@
+CREATE TABLE IF NOT EXISTS products (
+  id varchar(120) PRIMARY KEY,
+  name varchar(255) NOT NULL,
+  english_name varchar(160) NOT NULL,
+  telugu_name varchar(160) NOT NULL,
+  description varchar(800) NOT NULL,
+  category varchar(80) NOT NULL,
+  image_url varchar(500) NOT NULL,
+  unit varchar(80) NOT NULL,
+  price numeric(12,2) NOT NULL CHECK (price > 0),
+  mrp numeric(12,2) NOT NULL CHECK (mrp >= price),
+  shop_unit varchar(80) NOT NULL,
+  shop_price numeric(12,2) NOT NULL CHECK (shop_price > 0),
+  shop_mrp numeric(12,2) NOT NULL CHECK (shop_mrp >= shop_price),
+  stock_quantity integer NOT NULL CHECK (stock_quantity >= 0),
+  active boolean NOT NULL DEFAULT true,
+  fresh boolean NOT NULL DEFAULT true,
+  rating numeric(3,2) NOT NULL DEFAULT 0,
+  review_count integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE products ADD COLUMN IF NOT EXISTS category varchar(80) NOT NULL DEFAULT 'vegetables';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS english_name varchar(160) NOT NULL DEFAULT '';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS telugu_name varchar(160) NOT NULL DEFAULT '';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS description varchar(800) NOT NULL DEFAULT '';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url varchar(500) NOT NULL DEFAULT '';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS unit varchar(80) NOT NULL DEFAULT '';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS price numeric(12,2) NOT NULL DEFAULT 1;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS mrp numeric(12,2) NOT NULL DEFAULT 1;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS shop_unit varchar(80) NOT NULL DEFAULT '';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS shop_price numeric(12,2) NOT NULL DEFAULT 1;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS shop_mrp numeric(12,2) NOT NULL DEFAULT 1;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_quantity integer NOT NULL DEFAULT 0;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS fresh boolean NOT NULL DEFAULT true;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS rating numeric(3,2) NOT NULL DEFAULT 0;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS review_count integer NOT NULL DEFAULT 0;
+
 INSERT INTO products (id, name, english_name, telugu_name, description, category, image_url, unit, price, mrp, shop_unit, shop_price, shop_mrp, stock_quantity, active, fresh, rating, review_count)
 VALUES
   ('vegetables_amaranth', 'Amaranth (తోటకూర)', 'Amaranth', 'తోటకూర', 'Fresh Amaranth, quality-checked and packed for Farm To Home delivery.', 'vegetables', 'assets/images/vegetables/amaranth.png', '1 fresh bunch', 24, 27, '10 kg crate', 380, 432, 100, true, true, 4.20, 24),
