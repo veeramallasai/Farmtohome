@@ -33,8 +33,9 @@ public class AuthDtos {
 
   public record ResetPasswordRequest(
       @NotBlank @Email String email,
-      @NotBlank String otpCode,
-      @NotBlank @Size(min = 6) String newPassword
+      String otpCode,
+      String otp,
+      @Size(min = 6) String newPassword
   ) {}
 
   public record AuthResponse(

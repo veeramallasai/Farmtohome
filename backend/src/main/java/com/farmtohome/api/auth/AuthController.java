@@ -42,7 +42,7 @@ public class AuthController {
       AppUserEntity newUser = findOrCreateUserEntity(uid, email, name, null);
       return processUserLogin(newUser.getFirebaseUid(), email, newUser.getDisplayName(), newUser.getPhotoUrl());
     }
-    
+
     AppUserEntity u = entity.get();
     return processUserLogin(u.getFirebaseUid(), email, u.getDisplayName(), u.getPhotoUrl());
   }
@@ -87,18 +87,21 @@ public class AuthController {
     return processUserLogin(uid, email, entity.getDisplayName(), entity.getPhotoUrl());
   }
 
-  @PostMapping("/forgot-password")
+  @PostMapping({"/forgot-password", "/email-otp/forgot-password", "/request-otp", "/email-otp/request-otp"})
   public ApiResponse<Map<String, Object>> forgotPassword(
       @Valid @RequestBody AuthDtos.ForgotPasswordRequest request) {
     Map<String, Object> response = emailOtpService.sendForEmail(request.email().trim().toLowerCase());
     return ApiResponse.ok(response, "Password reset OTP sent to email.");
   }
 
-  @PostMapping("/reset-password")
+  @PostMapping({"/reset-password", "/email-otp/reset-password", "/email-otp/verify-reset-password"})
   public ApiResponse<Map<String, Object>> resetPassword(
       @Valid @RequestBody AuthDtos.ResetPasswordRequest request) {
+    String otp = (request.otpCode() != null && !request.otpCode().isBlank())
+        ? request.otpCode().trim()
+        : (request.otp() != null ? request.otp().trim() : "");
     Map<String, Object> response = emailOtpService.verifyForEmail(
-        request.email().trim().toLowerCase(), request.otpCode().trim());
+        request.email().trim().toLowerCase(), otp);
 
     return ApiResponse.ok(response, "Password reset successfully.");
   }

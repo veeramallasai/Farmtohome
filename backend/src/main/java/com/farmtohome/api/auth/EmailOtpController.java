@@ -66,7 +66,7 @@ public class EmailOtpController {
     return ApiResponse.ok(service.statusForEmail(target));
   }
 
-  @PostMapping("/request")
+  @PostMapping({"/request", "/forgot-password", "/send-otp"})
   public ApiResponse<Map<String, Object>> request(
       @Valid @RequestBody EmailOtpDtos.RequestOtpRequest request) {
     return ApiResponse.ok(
@@ -74,7 +74,7 @@ public class EmailOtpController {
         "Email OTP sent.");
   }
 
-  @PostMapping("/verify-reset")
+  @PostMapping({"/verify-reset", "/verify-otp", "/reset-password"})
   public ApiResponse<Map<String, Object>> verifyReset(
       @Valid @RequestBody EmailOtpDtos.VerifyResetRequest request) {
     return ApiResponse.ok(
