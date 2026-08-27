@@ -50,7 +50,14 @@ CREATE TABLE IF NOT EXISTS coupons (
   maximum_discount numeric(12,2) NOT NULL DEFAULT 0,
   active boolean NOT NULL DEFAULT true
 );
-ALTER TABLE coupons ALTER COLUMN id TYPE varchar(80) USING id::text;
+DO $$
+BEGIN
+  BEGIN
+    ALTER TABLE coupons ALTER COLUMN id TYPE varchar(80) USING id::text;
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
+END $$;
 ALTER TABLE coupons ADD COLUMN IF NOT EXISTS code varchar(80) NOT NULL DEFAULT '';
 ALTER TABLE coupons ADD COLUMN IF NOT EXISTS title varchar(180) NOT NULL DEFAULT '';
 ALTER TABLE coupons ADD COLUMN IF NOT EXISTS discount_type varchar(30) NOT NULL DEFAULT 'percentage';

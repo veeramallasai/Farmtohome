@@ -9,10 +9,17 @@ CREATE TABLE IF NOT EXISTS coupons (
   active boolean NOT NULL DEFAULT true
 );
 
-ALTER TABLE coupons ALTER COLUMN id TYPE varchar(80) USING id::text;
+DO $$
+BEGIN
+  BEGIN
+    ALTER TABLE coupons ALTER COLUMN id TYPE varchar(80) USING id::text;
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
+END $$;
 
 INSERT INTO coupons (id, code, title, discount_type, discount_value, minimum_order, maximum_discount, active)
 VALUES
-  ('fresh10', 'FRESH10', '10% fresh savings', 'percentage', 10, 299, 100, true),
-  ('farm50', 'FARM50', 'Flat ₹50 off', 'fixed', 50, 499, 50, true)
-ON CONFLICT (id) DO NOTHING;
+  ('11111111-1111-1111-1111-111111111111', 'FRESH10', '10% fresh savings', 'percentage', 10, 299, 100, true),
+  ('22222222-2222-2222-2222-222222222222', 'FARM50', 'Flat ₹50 off', 'fixed', 50, 499, 50, true)
+ON CONFLICT (code) DO NOTHING;
