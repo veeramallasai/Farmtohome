@@ -1,4 +1,4 @@
-CREATE TABLE addresses (
+CREATE TABLE IF NOT EXISTS addresses (
   id uuid PRIMARY KEY,
   owner_uid varchar(160) NOT NULL REFERENCES app_users(firebase_uid) ON DELETE CASCADE,
   full_name varchar(160) NOT NULL,
@@ -21,9 +21,9 @@ CREATE TABLE addresses (
   CONSTRAINT chk_addresses_longitude CHECK (longitude BETWEEN -180 AND 180)
 );
 
-CREATE INDEX idx_addresses_owner_created
+CREATE INDEX IF NOT EXISTS idx_addresses_owner_created
   ON addresses(owner_uid, created_at DESC);
 
-CREATE UNIQUE INDEX uk_addresses_one_default_per_owner
+CREATE UNIQUE INDEX IF NOT EXISTS uk_addresses_one_default_per_owner
   ON addresses(owner_uid)
   WHERE is_default = true;

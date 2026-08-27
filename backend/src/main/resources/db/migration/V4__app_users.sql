@@ -1,4 +1,4 @@
-CREATE TABLE app_users (
+CREATE TABLE IF NOT EXISTS app_users (
   firebase_uid varchar(160) PRIMARY KEY,
   first_name varchar(100) NOT NULL DEFAULT '',
   last_name varchar(100) NOT NULL DEFAULT '',
@@ -21,13 +21,13 @@ CREATE TABLE app_users (
     CHECK (account_type IN ('customer', 'shop_owner'))
 );
 
-CREATE UNIQUE INDEX uk_app_users_email
+CREATE UNIQUE INDEX IF NOT EXISTS uk_app_users_email
   ON app_users (lower(email))
   WHERE email <> '';
 
-CREATE UNIQUE INDEX uk_app_users_phone
+CREATE UNIQUE INDEX IF NOT EXISTS uk_app_users_phone
   ON app_users (phone_number)
   WHERE phone_number <> '' AND phone_verified;
 
-CREATE INDEX idx_app_users_last_login
+CREATE INDEX IF NOT EXISTS idx_app_users_last_login
   ON app_users (last_login_at DESC);

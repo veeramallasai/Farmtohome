@@ -1,4 +1,4 @@
-CREATE TABLE products (
+CREATE TABLE IF NOT EXISTS products (
   id varchar(120) PRIMARY KEY,
   name varchar(255) NOT NULL,
   english_name varchar(160) NOT NULL,
@@ -20,9 +20,9 @@ CREATE TABLE products (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_products_category_active ON products(category, active);
+CREATE INDEX IF NOT EXISTS idx_products_category_active ON products(category, active);
 
-CREATE TABLE coupons (
+CREATE TABLE IF NOT EXISTS coupons (
   id varchar(80) PRIMARY KEY,
   code varchar(80) NOT NULL UNIQUE,
   title varchar(180) NOT NULL,
@@ -33,14 +33,14 @@ CREATE TABLE coupons (
   active boolean NOT NULL DEFAULT true
 );
 
-CREATE TABLE carts (
+CREATE TABLE IF NOT EXISTS carts (
   owner_uid varchar(160) PRIMARY KEY,
   shopping_mode varchar(20) NOT NULL DEFAULT 'home',
   coupon_code varchar(80) NOT NULL DEFAULT '',
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE cart_items (
+CREATE TABLE IF NOT EXISTS cart_items (
   id bigserial PRIMARY KEY,
   owner_uid varchar(160) NOT NULL REFERENCES carts(owner_uid) ON DELETE CASCADE,
   item_key varchar(180) NOT NULL,
@@ -51,9 +51,9 @@ CREATE TABLE cart_items (
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT uk_cart_item_owner_key UNIQUE (owner_uid, item_key)
 );
-CREATE INDEX idx_cart_items_owner ON cart_items(owner_uid);
+CREATE INDEX IF NOT EXISTS idx_cart_items_owner ON cart_items(owner_uid);
 
-CREATE TABLE orders (
+CREATE TABLE IF NOT EXISTS orders (
   id uuid PRIMARY KEY,
   order_number varchar(60) NOT NULL UNIQUE,
   owner_uid varchar(160) NOT NULL,
@@ -79,9 +79,9 @@ CREATE TABLE orders (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_orders_owner_created ON orders(owner_uid, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_orders_owner_created ON orders(owner_uid, created_at DESC);
 
-CREATE TABLE order_items (
+CREATE TABLE IF NOT EXISTS order_items (
   id bigserial PRIMARY KEY,
   order_id uuid NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
   cart_item_id varchar(180) NOT NULL,
@@ -96,9 +96,9 @@ CREATE TABLE order_items (
   quantity integer NOT NULL,
   line_total numeric(12,2) NOT NULL
 );
-CREATE INDEX idx_order_items_order ON order_items(order_id);
+CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
 
-CREATE TABLE payments (
+CREATE TABLE IF NOT EXISTS payments (
   id uuid PRIMARY KEY,
   order_id uuid NOT NULL UNIQUE REFERENCES orders(id) ON DELETE CASCADE,
   owner_uid varchar(160) NOT NULL,
@@ -110,4 +110,4 @@ CREATE TABLE payments (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_payments_owner ON payments(owner_uid, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_payments_owner ON payments(owner_uid, created_at DESC);

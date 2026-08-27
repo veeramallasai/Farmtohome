@@ -1,4 +1,4 @@
-CREATE TABLE categories (
+CREATE TABLE IF NOT EXISTS categories (
   id varchar(80) PRIMARY KEY,
   name varchar(160) NOT NULL,
   description varchar(500) NOT NULL DEFAULT '',
@@ -9,9 +9,9 @@ CREATE TABLE categories (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_categories_active_sort ON categories(active, sort_order);
+CREATE INDEX IF NOT EXISTS idx_categories_active_sort ON categories(active, sort_order);
 
-CREATE TABLE banners (
+CREATE TABLE IF NOT EXISTS banners (
   id varchar(100) PRIMARY KEY,
   title varchar(200) NOT NULL,
   subtitle varchar(500) NOT NULL DEFAULT '',
@@ -26,9 +26,9 @@ CREATE TABLE banners (
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT chk_banner_dates CHECK (ends_at IS NULL OR starts_at IS NULL OR ends_at >= starts_at)
 );
-CREATE INDEX idx_banners_visible ON banners(active, priority);
+CREATE INDEX IF NOT EXISTS idx_banners_visible ON banners(active, priority);
 
-CREATE TABLE offers (
+CREATE TABLE IF NOT EXISTS offers (
   id varchar(100) PRIMARY KEY,
   title varchar(200) NOT NULL,
   description varchar(500) NOT NULL DEFAULT '',
@@ -46,9 +46,9 @@ CREATE TABLE offers (
   CONSTRAINT chk_offer_type CHECK (discount_type IN ('percentage', 'fixed')),
   CONSTRAINT chk_offer_dates CHECK (ends_at IS NULL OR starts_at IS NULL OR ends_at >= starts_at)
 );
-CREATE INDEX idx_offers_active ON offers(active, starts_at, ends_at);
+CREATE INDEX IF NOT EXISTS idx_offers_active ON offers(active, starts_at, ends_at);
 
-CREATE TABLE farmers (
+CREATE TABLE IF NOT EXISTS farmers (
   id varchar(120) PRIMARY KEY,
   name varchar(180) NOT NULL,
   farm_name varchar(220) NOT NULL,
@@ -63,9 +63,9 @@ CREATE TABLE farmers (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_farmers_active_rating ON farmers(active, verified DESC, rating DESC);
+CREATE INDEX IF NOT EXISTS idx_farmers_active_rating ON farmers(active, verified DESC, rating DESC);
 
-CREATE TABLE delivery_slots (
+CREATE TABLE IF NOT EXISTS delivery_slots (
   id varchar(120) PRIMARY KEY,
   method varchar(40) NOT NULL,
   label varchar(160) NOT NULL,
@@ -82,18 +82,18 @@ CREATE TABLE delivery_slots (
   CONSTRAINT chk_delivery_times CHECK (end_time > start_time),
   CONSTRAINT chk_delivery_capacity CHECK (capacity = 0 OR booked_count <= capacity)
 );
-CREATE INDEX idx_delivery_slots_lookup ON delivery_slots(method, slot_date, available, start_time);
+CREATE INDEX IF NOT EXISTS idx_delivery_slots_lookup ON delivery_slots(method, slot_date, available, start_time);
 
-CREATE TABLE favorites (
+CREATE TABLE IF NOT EXISTS favorites (
   id bigserial PRIMARY KEY,
   owner_uid varchar(160) NOT NULL,
   product_id varchar(120) NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT uk_favorites_owner_product UNIQUE (owner_uid, product_id)
 );
-CREATE INDEX idx_favorites_owner ON favorites(owner_uid, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_favorites_owner ON favorites(owner_uid, created_at DESC);
 
-CREATE TABLE reviews (
+CREATE TABLE IF NOT EXISTS reviews (
   id uuid PRIMARY KEY,
   product_id varchar(120) NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   owner_uid varchar(160) NOT NULL,
@@ -106,9 +106,9 @@ CREATE TABLE reviews (
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT uk_reviews_owner_product UNIQUE (owner_uid, product_id)
 );
-CREATE INDEX idx_reviews_product_created ON reviews(product_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reviews_product_created ON reviews(product_id, created_at DESC);
 
-CREATE TABLE notifications (
+CREATE TABLE IF NOT EXISTS notifications (
   id uuid PRIMARY KEY,
   owner_uid varchar(160) NOT NULL,
   title varchar(220) NOT NULL,
@@ -120,10 +120,10 @@ CREATE TABLE notifications (
   is_read boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_notifications_owner_created ON notifications(owner_uid, created_at DESC);
-CREATE INDEX idx_notifications_unread ON notifications(owner_uid, is_read) WHERE NOT is_read;
+CREATE INDEX IF NOT EXISTS idx_notifications_owner_created ON notifications(owner_uid, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(owner_uid, is_read) WHERE NOT is_read;
 
-CREATE TABLE support_tickets (
+CREATE TABLE IF NOT EXISTS support_tickets (
   id uuid PRIMARY KEY,
   owner_uid varchar(160) NOT NULL,
   subject varchar(220) NOT NULL,
@@ -137,9 +137,9 @@ CREATE TABLE support_tickets (
   CONSTRAINT chk_support_status CHECK (status IN ('open', 'in_progress', 'resolved', 'closed')),
   CONSTRAINT chk_support_priority CHECK (priority IN ('low', 'normal', 'high', 'urgent'))
 );
-CREATE INDEX idx_support_owner_updated ON support_tickets(owner_uid, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_support_owner_updated ON support_tickets(owner_uid, updated_at DESC);
 
-CREATE TABLE device_tokens (
+CREATE TABLE IF NOT EXISTS device_tokens (
   id bigserial PRIMARY KEY,
   owner_uid varchar(160) NOT NULL,
   token varchar(1000) NOT NULL UNIQUE,
@@ -149,9 +149,9 @@ CREATE TABLE device_tokens (
   last_seen_at timestamptz NOT NULL DEFAULT now(),
   created_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_device_tokens_owner ON device_tokens(owner_uid, active);
+CREATE INDEX IF NOT EXISTS idx_device_tokens_owner ON device_tokens(owner_uid, active);
 
-CREATE TABLE payment_events (
+CREATE TABLE IF NOT EXISTS payment_events (
   id uuid PRIMARY KEY,
   payment_id uuid REFERENCES payments(id) ON DELETE SET NULL,
   owner_uid varchar(160) NOT NULL,
@@ -163,7 +163,7 @@ CREATE TABLE payment_events (
   processed_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_payment_events_payment ON payment_events(payment_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_payment_events_payment ON payment_events(payment_id, created_at DESC);
 
 INSERT INTO categories (id, name, description, image_url, icon_name, sort_order)
 VALUES

@@ -1,6 +1,6 @@
-CREATE TABLE email_verification_otps (
+CREATE TABLE IF NOT EXISTS email_verification_otps (
   id bigserial PRIMARY KEY,
-  firebase_uid varchar(160) NOT NULL REFERENCES app_users(firebase_uid) ON DELETE CASCADE,
+  firebase_uid varchar(160) NOT NULL DEFAULT '',
   email varchar(320) NOT NULL,
   otp_hash varchar(256) NOT NULL,
   purpose varchar(50) NOT NULL,
@@ -12,8 +12,8 @@ CREATE TABLE email_verification_otps (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_email_verification_otps_uid_email
+CREATE INDEX IF NOT EXISTS idx_email_verification_otps_uid_email
   ON email_verification_otps(firebase_uid, email);
 
-CREATE INDEX idx_email_verification_otps_expires_at
+CREATE INDEX IF NOT EXISTS idx_email_verification_otps_expires_at
   ON email_verification_otps(expires_at);
