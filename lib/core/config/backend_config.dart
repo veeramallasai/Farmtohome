@@ -41,8 +41,11 @@ class BackendConfig {
     if (_railwayUrl.trim().isNotEmpty) {
       return _withoutTrailingSlash(_railwayUrl.trim());
     }
-    if (kIsWeb || kReleaseMode) {
-      return _withoutTrailingSlash(_defaultProductionUrl);
+    if (kIsWeb) {
+      final String origin = Uri.base.origin;
+      if (origin.isNotEmpty && !origin.startsWith('file://') && origin != 'null') {
+        return _withoutTrailingSlash(origin);
+      }
     }
     return _withoutTrailingSlash(_defaultProductionUrl);
   }
