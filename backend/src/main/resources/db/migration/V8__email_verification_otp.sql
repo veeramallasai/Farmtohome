@@ -1,16 +1,25 @@
 CREATE TABLE IF NOT EXISTS email_verification_otps (
   id bigserial PRIMARY KEY,
   firebase_uid varchar(160) NOT NULL DEFAULT '',
-  email varchar(320) NOT NULL,
-  otp_hash varchar(256) NOT NULL,
-  purpose varchar(50) NOT NULL,
-  expires_at timestamptz NOT NULL,
+  email varchar(320) NOT NULL DEFAULT '',
+  otp_hash varchar(256) NOT NULL DEFAULT '',
+  purpose varchar(50) NOT NULL DEFAULT '',
+  expires_at timestamptz NOT NULL DEFAULT now(),
   verified_at timestamptz,
   attempts integer NOT NULL DEFAULT 0,
   resend_count integer NOT NULL DEFAULT 0,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE email_verification_otps ADD COLUMN IF NOT EXISTS firebase_uid varchar(160) NOT NULL DEFAULT '';
+ALTER TABLE email_verification_otps ADD COLUMN IF NOT EXISTS email varchar(320) NOT NULL DEFAULT '';
+ALTER TABLE email_verification_otps ADD COLUMN IF NOT EXISTS otp_hash varchar(256) NOT NULL DEFAULT '';
+ALTER TABLE email_verification_otps ADD COLUMN IF NOT EXISTS purpose varchar(50) NOT NULL DEFAULT '';
+ALTER TABLE email_verification_otps ADD COLUMN IF NOT EXISTS expires_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE email_verification_otps ADD COLUMN IF NOT EXISTS verified_at timestamptz;
+ALTER TABLE email_verification_otps ADD COLUMN IF NOT EXISTS attempts integer NOT NULL DEFAULT 0;
+ALTER TABLE email_verification_otps ADD COLUMN IF NOT EXISTS resend_count integer NOT NULL DEFAULT 0;
 
 CREATE INDEX IF NOT EXISTS idx_email_verification_otps_uid_email
   ON email_verification_otps(firebase_uid, email);

@@ -21,6 +21,22 @@ CREATE TABLE IF NOT EXISTS app_users (
     CHECK (account_type IN ('customer', 'shop_owner'))
 );
 
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS first_name varchar(100) NOT NULL DEFAULT '';
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS last_name varchar(100) NOT NULL DEFAULT '';
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS display_name varchar(220) NOT NULL DEFAULT '';
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS email varchar(320) NOT NULL DEFAULT '';
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS phone_number varchar(32) NOT NULL DEFAULT '';
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS photo_url varchar(1000) NOT NULL DEFAULT '';
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS shopping_mode varchar(20) NOT NULL DEFAULT 'home';
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS account_type varchar(40) NOT NULL DEFAULT 'customer';
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS auth_provider varchar(80) NOT NULL DEFAULT 'password';
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS email_verified boolean NOT NULL DEFAULT false;
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS phone_verified boolean NOT NULL DEFAULT false;
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true;
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS last_login_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
 CREATE UNIQUE INDEX IF NOT EXISTS uk_app_users_email
   ON app_users (lower(email))
   WHERE email <> '';
