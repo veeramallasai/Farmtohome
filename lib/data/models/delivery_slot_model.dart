@@ -29,7 +29,7 @@ class DeliverySlotModel {
   bool get canBook => isAvailable && hasCapacity;
 
   factory DeliverySlotModel.fromDocument(
-    DocumentSnapshot<Map<String, dynamic>> document,
+    dynamic document,
   ) {
     return DeliverySlotModel.fromMap(
       document.data() ?? <String, dynamic>{},

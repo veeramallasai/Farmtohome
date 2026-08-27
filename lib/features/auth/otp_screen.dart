@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:farm_to_home_app/core/auth/backend_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -359,16 +358,6 @@ class _OtpScreenState extends State<OtpScreen>
             ? widget.userId!.trim()
             : currentUser.uid;
 
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .set(<String, dynamic>{
-          'phoneNumber': _formattedPhone,
-          'phoneVerified': true,
-          'phoneVerifiedAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-
     await currentUser.reload();
     await UserRepository().syncCurrentUser();
 
@@ -484,18 +473,6 @@ class _OtpScreenState extends State<OtpScreen>
           widget.userId?.trim().isNotEmpty == true
               ? widget.userId!.trim()
               : currentUser.uid;
-
-      if (uid.isNotEmpty) {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(uid)
-            .set(<String, dynamic>{
-              'emailVerified': true,
-              'isActive': true,
-              'emailVerifiedAt': FieldValue.serverTimestamp(),
-              'updatedAt': FieldValue.serverTimestamp(),
-            }, SetOptions(merge: true));
-      }
 
       await currentUser.reload();
       await UserRepository().syncCurrentUser();

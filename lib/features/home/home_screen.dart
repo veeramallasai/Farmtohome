@@ -9,6 +9,7 @@ import '../../core/widgets/premium_toast.dart';
 import '../../data/local/local_product_catalog.dart';
 import '../../data/models/cart_item_model.dart';
 import '../../data/models/product_model.dart';
+import '../../data/repositories/user_repository.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/product_provider.dart';
 import 'widgets/floating_cart_bar.dart';
@@ -209,20 +210,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadShoppingMode() async {
     try {
-      final User? user = BackendAuth.instance.currentUser;
-
-      if (user == null) {
-  Future<void> _loadShoppingMode() async {
+      final mode = await UserRepository().getCurrentUser().then((u) => u.shoppingMode).catchError((_) => _shoppingMode);
+      if (mounted) {
+        setState(() => _shoppingMode = mode);
+      }
+    } catch (_) {}
   }
 
   Future<void> _saveShoppingMode(String mode) async {
     try {
       await UserRepository().updateShoppingMode(mode);
     } catch (_) {}
-  }
-    } catch (_) {
-      // UI continues even when network sync fails.
-    }
   }
 
   String get _userName {

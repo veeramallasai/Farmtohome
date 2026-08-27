@@ -7,6 +7,7 @@ import '../../core/widgets/premium_toast.dart';
 import '../../data/models/cart_item_model.dart';
 import '../../data/models/product_model.dart';
 import '../../data/repositories/product_repository.dart';
+import '../../data/repositories/user_repository.dart';
 import '../../providers/cart_provider.dart';
 import '../home/widgets/floating_cart_bar.dart';
 import '../home/widgets/product_card.dart';
@@ -61,19 +62,17 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
 
   Future<void> _loadSavedShoppingMode() async {
     try {
-      final User? user = BackendAuth.instance.currentUser;
-
-  Future<void> _loadShoppingMode() async {
+      final mode = await UserRepository().getCurrentUser().then((u) => u.shoppingMode).catchError((_) => _shoppingMode);
+      if (mounted) {
+        setState(() => _shoppingMode = mode);
+      }
+    } catch (_) {}
   }
 
   Future<void> _saveShoppingMode(String mode) async {
     try {
       await UserRepository().updateShoppingMode(mode);
     } catch (_) {}
-  }
-    } catch (_) {
-      // UI remains usable if Firestore sync fails.
-    }
   }
 
   Future<void> _refreshProducts() async {

@@ -64,7 +64,7 @@ class ProductModel {
   }
 
   factory ProductModel.fromDocument(
-    DocumentSnapshot<Map<String, dynamic>> document,
+    dynamic document,
   ) {
     return ProductModel.fromMap(
       document.data() ?? <String, dynamic>{},

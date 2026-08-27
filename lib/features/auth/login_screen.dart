@@ -1,12 +1,12 @@
 import 'dart:ui';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:farm_to_home_app/core/auth/backend_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../app/app_routes.dart';
+import '../../data/repositories/user_repository.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -104,41 +104,7 @@ class _LoginScreenState extends State<LoginScreen>
 
   Future<String> _emailForIdentifier(String identifier) async {
     final String input = identifier.trim();
-    if (input.contains('@')) return input.toLowerCase();
-
-    final String phone = _normalizePhone(input);
-    QuerySnapshot<Map<String, dynamic>> result =
-        await FirebaseFirestore.instance
-            .collection('users')
-            .where('phoneNumber', isEqualTo: '+91$phone')
-            .limit(1)
-            .get();
-
-    if (result.docs.isEmpty) {
-      result =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .where('phoneNumber', isEqualTo: phone)
-              .limit(1)
-              .get();
-    }
-
-    if (result.docs.isEmpty) {
-      throw BackendAuthException(
-        code: 'user-not-found',
-        message: 'No account was found for this mobile number.',
-      );
-    }
-
-    final String email =
-        (result.docs.first.data()['email'] ?? '').toString().trim();
-    if (email.isEmpty) {
-      throw BackendAuthException(
-        code: 'missing-email',
-        message: 'This mobile number is not linked to an email account.',
-      );
-    }
-    return email.toLowerCase();
+    return input.toLowerCase();
   }
 
   Future<void> _login() async {
@@ -165,28 +131,8 @@ class _LoginScreenState extends State<LoginScreen>
         throw BackendAuthException(code: 'login-failed');
       }
 
-      final DocumentSnapshot<Map<String, dynamic>> profileSnapshot =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .get();
-      final Map<String, dynamic>? profile = profileSnapshot.data();
-      final String phone = (profile?['phoneNumber'] ?? '').toString().trim();
-      final bool phoneVerified = profile?['phoneVerified'] == true;
-
+      await UserRepository().syncCurrentUser();
       if (!mounted) return;
-
-      if (phone.isNotEmpty && !phoneVerified) {
-        Navigator.of(context).pushReplacementNamed(
-          AppRoutes.otp,
-          arguments: <String, dynamic>{
-            'phoneNumber': phone,
-            'userId': user.uid,
-          },
-        );
-        return;
-      }
-
       Navigator.of(context).pushReplacementNamed(AppRoutes.home);
     } on BackendAuthException catch (error) {
       if (mounted) _showError(_firebaseMessage(error));
@@ -436,39 +382,7 @@ class _LoginScreenState extends State<LoginScreen>
       throw BackendAuthException(code: 'social-login-failed');
     }
 
-    final DocumentReference<Map<String, dynamic>> ref = FirebaseFirestore
-        .instance
-        .collection('users')
-        .doc(user.uid);
-    final DocumentSnapshot<Map<String, dynamic>> existing = await ref.get();
-
-    final List<String> names = (user.displayName ?? '').trim().split(
-      RegExp(r'\s+'),
-    );
-    final String firstName =
-        names.isNotEmpty && names.first.isNotEmpty ? names.first : '';
-    final String lastName = names.length > 1 ? names.sublist(1).join(' ') : '';
-
-    final Map<String, dynamic> profile = <String, dynamic>{
-      'uid': user.uid,
-      'firstName': firstName,
-      'lastName': lastName,
-      'displayName': user.displayName ?? '',
-      'email': user.email ?? '',
-      'phoneNumber': user.phoneNumber ?? '',
-      'photoUrl': user.photoURL ?? '',
-      'phoneVerified': user.phoneNumber?.isNotEmpty == true,
-      'shoppingMode': existing.data()?['shoppingMode'] ?? 'home',
-      'updatedAt': FieldValue.serverTimestamp(),
-      'lastLoginAt': FieldValue.serverTimestamp(),
-    };
-
-    if (!existing.exists) {
-      profile['createdAt'] = FieldValue.serverTimestamp();
-    }
-
-    await ref.set(profile, SetOptions(merge: true));
-
+    await UserRepository().syncCurrentUser();
     if (!mounted) return;
     Navigator.of(context).pushReplacementNamed(AppRoutes.home);
   }

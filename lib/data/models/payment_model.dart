@@ -85,7 +85,7 @@ class PaymentModel {
   }
 
   factory PaymentModel.fromDocument(
-    DocumentSnapshot<Map<String, dynamic>> document,
+    dynamic document,
   ) {
     return PaymentModel.fromMap(
       document.data() ?? <String, dynamic>{},

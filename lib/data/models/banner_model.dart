@@ -33,7 +33,7 @@ class BannerModel {
   }
 
   factory BannerModel.fromDocument(
-    DocumentSnapshot<Map<String, dynamic>> doc,
+    dynamic doc,
   ) => BannerModel.fromMap(
     doc.data() ?? <String, dynamic>{},
     documentId: doc.id,

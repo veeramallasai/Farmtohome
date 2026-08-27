@@ -42,3 +42,9 @@ class FirebaseException implements Exception {
   @override
   String toString() => '[$plugin/$code] $message';
 }
+
+class GeoPoint {
+  const GeoPoint(this.latitude, this.longitude);
+  final double latitude;
+  final double longitude;
+}

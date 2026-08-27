@@ -28,7 +28,7 @@ class ReviewModel {
   int get starRating => rating.clamp(0, 5).round();
 
   factory ReviewModel.fromDocument(
-    DocumentSnapshot<Map<String, dynamic>> doc,
+    dynamic doc,
   ) => ReviewModel.fromMap(
     doc.data() ?? <String, dynamic>{},
     documentId: doc.id,

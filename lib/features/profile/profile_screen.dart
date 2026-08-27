@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import '../../app/app_routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/order_model.dart';
+import '../../data/models/user_model.dart';
 import '../../data/repositories/order_repository.dart';
+import '../../data/repositories/user_repository.dart';
 import 'widgets/logout_button.dart';
 import 'widgets/order_summary_card.dart';
 import 'widgets/profile_header.dart';
@@ -28,8 +30,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _profileOrdersUserId;
 
   Future<void> _logout() async {
+    if (_loggingOut) return;
     setState(() => _loggingOut = true);
-    await BackendAuth.instance.signOut();
+    try {
+      await BackendAuth.instance.signOut();
+    } catch (_) {}
     if (!mounted) return;
     Navigator.pushNamedAndRemoveUntil(
       context,
@@ -51,10 +56,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       }
     } catch (_) {
-    } finally {
-      if (mounted) setState(() => _savingMode = false);
-    }
-  }
       if (mounted) _message('Unable to change shopping mode.', error: true);
     } finally {
       if (mounted) setState(() => _savingMode = false);

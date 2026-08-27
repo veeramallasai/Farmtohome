@@ -26,7 +26,7 @@ class CategoryModel {
   final DateTime? updatedAt;
 
   factory CategoryModel.fromDocument(
-    DocumentSnapshot<Map<String, dynamic>> doc,
+    dynamic doc,
   ) => CategoryModel.fromMap(
     doc.data() ?? <String, dynamic>{},
     documentId: doc.id,

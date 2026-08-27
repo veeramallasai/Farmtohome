@@ -28,7 +28,7 @@ class NotificationModel {
   bool get hasAction => route.isNotEmpty || data.isNotEmpty;
 
   factory NotificationModel.fromDocument(
-    DocumentSnapshot<Map<String, dynamic>> doc,
+    dynamic doc,
   ) => NotificationModel.fromMap(
     doc.data() ?? <String, dynamic>{},
     documentId: doc.id,

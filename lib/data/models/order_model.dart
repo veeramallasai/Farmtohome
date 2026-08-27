@@ -189,7 +189,7 @@ class OrderModel {
   }
 
   factory OrderModel.fromDocument(
-    DocumentSnapshot<Map<String, dynamic>> document,
+    dynamic document,
   ) {
     return OrderModel.fromMap(
       document.data() ?? <String, dynamic>{},

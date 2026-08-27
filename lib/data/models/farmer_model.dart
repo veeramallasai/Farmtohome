@@ -26,7 +26,7 @@ class FarmerModel {
   final String speciality;
 
   factory FarmerModel.fromDocument(
-    DocumentSnapshot<Map<String, dynamic>> document,
+    dynamic document,
   ) {
     return FarmerModel.fromMap(
       document.data() ?? <String, dynamic>{},

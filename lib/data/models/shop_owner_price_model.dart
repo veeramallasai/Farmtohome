@@ -26,7 +26,7 @@ class ShopOwnerPriceModel {
       mrp > price && mrp > 0 ? (savings * 100 / mrp).round() : 0;
 
   factory ShopOwnerPriceModel.fromDocument(
-    DocumentSnapshot<Map<String, dynamic>> doc,
+    dynamic doc,
   ) => ShopOwnerPriceModel.fromMap(
     doc.data() ?? <String, dynamic>{},
     documentId: doc.id,

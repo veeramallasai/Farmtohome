@@ -42,7 +42,7 @@ class UserModel {
 
   bool get isShopOwner => shoppingMode == 'shop';
 
-  factory UserModel.fromDocument(DocumentSnapshot<Map<String, dynamic>> doc) =>
+  factory UserModel.fromDocument(dynamic doc) =>
       UserModel.fromMap(doc.data() ?? <String, dynamic>{}, documentId: doc.id);
 
   factory UserModel.fromMap(

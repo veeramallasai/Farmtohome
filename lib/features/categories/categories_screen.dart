@@ -3,6 +3,7 @@ import 'package:farm_to_home_app/core/auth/backend_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../data/repositories/user_repository.dart';
 
 class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({super.key, this.initialShoppingMode = 'home'});
@@ -72,17 +73,18 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   }
 
   Future<void> _loadSavedMode() async {
-  Future<void> _loadMode() async {
+    try {
+      final mode = await UserRepository().getCurrentUser().then((u) => u.shoppingMode).catchError((_) => _shoppingMode);
+      if (mounted) {
+        setState(() => _shoppingMode = mode);
+      }
+    } catch (_) {}
   }
 
   Future<void> _saveMode(String mode) async {
     try {
       await UserRepository().updateShoppingMode(mode);
     } catch (_) {}
-  }
-    } catch (_) {
-      // UI mode continues even if Firestore is temporarily unavailable.
-    }
   }
 
   void _go(String route, {Object? arguments}) {

@@ -44,7 +44,7 @@ class CartModel {
   }
 
   factory CartModel.fromDocument(
-    DocumentSnapshot<Map<String, dynamic>> document,
+    dynamic document,
   ) {
     return CartModel.fromMap(
       document.data() ?? <String, dynamic>{},

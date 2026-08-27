@@ -51,7 +51,7 @@ class CouponModel {
   }
 
   factory CouponModel.fromDocument(
-    DocumentSnapshot<Map<String, dynamic>> doc,
+    dynamic doc,
   ) => CouponModel.fromMap(
     doc.data() ?? <String, dynamic>{},
     documentId: doc.id,

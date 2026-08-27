@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../auth/backend_auth.dart';
 import '../utils/timestamp_utils.dart';
 import 'package:http/http.dart' show ClientException;
 

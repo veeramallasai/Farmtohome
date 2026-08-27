@@ -36,7 +36,7 @@ class OfferModel {
         (endsAt == null || !now.isAfter(endsAt!));
   }
 
-  factory OfferModel.fromDocument(DocumentSnapshot<Map<String, dynamic>> doc) =>
+  factory OfferModel.fromDocument(dynamic doc) =>
       OfferModel.fromMap(doc.data() ?? <String, dynamic>{}, documentId: doc.id);
 
   factory OfferModel.fromMap(

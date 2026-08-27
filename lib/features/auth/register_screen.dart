@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:farm_to_home_app/core/auth/backend_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -237,38 +236,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       final User refreshedUser = BackendAuth.instance.currentUser ?? user;
 
-      final DocumentReference<Map<String, dynamic>> userRef = FirebaseFirestore
-          .instance
-          .collection('users')
-          .doc(refreshedUser.uid);
-
-      final DocumentSnapshot<Map<String, dynamic>> existing =
-          await userRef.get();
-
-      final Map<String, dynamic> profile = <String, dynamic>{
-        'uid': refreshedUser.uid,
-        'firstName': firstName,
-        'lastName': lastName,
-        'displayName': displayName,
-        'email': email,
-        'emailVerified': false,
-        'phoneNumber': phone,
-        'photoUrl': refreshedUser.photoURL ?? '',
-        'phoneVerified': false,
-        'shoppingMode': existing.data()?['shoppingMode'] ?? 'home',
-        'accountType': existing.data()?['accountType'] ?? 'customer',
-        'isActive': false,
-        'updatedAt': FieldValue.serverTimestamp(),
-        'lastLoginAt': FieldValue.serverTimestamp(),
-      };
-
-      if (!existing.exists) {
-        profile['createdAt'] = FieldValue.serverTimestamp();
-      }
-
-      await userRef.set(profile, SetOptions(merge: true));
-
-      await _syncBackendProfileWithRetry();
+      await UserRepository().syncCurrentUser(
+        firstName: firstName,
+        lastName: lastName,
+        phoneNumber: phone,
+      );
 
       if (!mounted) return;
 

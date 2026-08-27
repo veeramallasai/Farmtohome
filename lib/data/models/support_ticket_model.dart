@@ -37,7 +37,7 @@ class SupportTicketModel {
       .join(' ');
 
   factory SupportTicketModel.fromDocument(
-    DocumentSnapshot<Map<String, dynamic>> doc,
+    dynamic doc,
   ) => SupportTicketModel.fromMap(
     doc.data() ?? <String, dynamic>{},
     documentId: doc.id,
