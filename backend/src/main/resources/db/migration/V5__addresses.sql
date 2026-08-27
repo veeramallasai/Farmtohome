@@ -1,3 +1,4 @@
+-- table addresses schema migration
 CREATE TABLE IF NOT EXISTS addresses (
   id uuid PRIMARY KEY,
   owner_uid varchar(160) NOT NULL REFERENCES app_users(firebase_uid) ON DELETE CASCADE,

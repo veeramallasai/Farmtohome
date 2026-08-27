@@ -24,9 +24,11 @@ class MigrationCoverageTest {
         "reviews", "notifications", "notification_preferences",
         "support_tickets", "device_tokens", "payment_events"
     }) {
-      assertThat(migrations.toLowerCase())
+      String lower = migrations.toLowerCase();
+      boolean found = lower.contains("table " + table) || lower.contains("table if not exists " + table);
+      assertThat(found)
           .as("migration for table %s", table)
-          .contains("table " + table);
+          .isTrue();
     }
   }
 
