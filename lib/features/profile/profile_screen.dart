@@ -263,6 +263,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             final String phone = model?.phoneNumber ?? user?.phoneNumber ?? '';
             final String photo = model?.photoUrl ?? user?.photoURL ?? '';
             final String mode = model?.isShopOwner == true ? 'Shop Owner' : 'Home Shopping';
+            final String rawMode = model?.shoppingMode ?? 'home';
 
             return CustomScrollView(
               slivers: <Widget>[
