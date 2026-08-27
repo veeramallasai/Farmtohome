@@ -5,7 +5,9 @@ import com.farmtohome.api.common.ApiResponse;
 import com.farmtohome.api.user.AppUserEntity;
 import com.farmtohome.api.user.AppUserRepository;
 import jakarta.validation.Valid;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -68,20 +70,47 @@ public class AuthController {
     return processUserLogin(uid, email, entity.getDisplayName(), entity.getPhotoUrl());
   }
 
-  @PostMapping("/social-login")
+  @PostMapping({"/social-login", "/google", "/google-login", "/google/login", "/google-signin", "/social", "/social/login"})
   public ApiResponse<AuthDtos.AuthResponse> socialLogin(
-      @Valid @RequestBody AuthDtos.SocialLoginRequest request) {
-    String email = request.email().trim().toLowerCase();
+      @RequestBody AuthDtos.SocialLoginRequest request) {
+    String prov = (request != null && request.provider() != null && !request.provider().isBlank())
+        ? request.provider().trim().toLowerCase()
+        : "google";
+
+    String rawToken = request != null
+        ? (request.idToken() != null ? request.idToken() : (request.token() != null ? request.token() : request.credential()))
+        : null;
+
+    Map<String, Object> tokenClaims = parseJwtClaims(rawToken);
+
+    String email = (request != null && request.email() != null && !request.email().isBlank())
+        ? request.email().trim().toLowerCase()
+        : (tokenClaims.containsKey("email") ? tokenClaims.get("email").toString().trim().toLowerCase() : null);
+
+    if (email == null || email.isBlank()) {
+      email = "user_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8) + "@gmail.com";
+    }
 
     Optional<AppUserEntity> existing = userRepository.findByEmail(email);
     String uid = existing.map(AppUserEntity::getFirebaseUid)
         .orElseGet(() -> "soc_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16));
 
-    String name = ((request.firstName() != null ? request.firstName() : "") + " " + (request.lastName() != null ? request.lastName() : "")).trim();
+    String firstName = (request != null && request.firstName() != null) ? request.firstName() : "";
+    String lastName = (request != null && request.lastName() != null) ? request.lastName() : "";
+    String name = (firstName + " " + lastName).trim();
+
+    if (name.isEmpty() && tokenClaims.containsKey("name")) {
+      name = tokenClaims.get("name").toString().trim();
+    }
     if (name.isEmpty()) name = email.split("@")[0];
 
-    AppUserEntity entity = findOrCreateUserEntity(uid, email, name, request.photoUrl());
-    entity.setAuthProvider(request.provider());
+    String photo = (request != null && request.photoUrl() != null) ? request.photoUrl() : null;
+    if ((photo == null || photo.isBlank()) && tokenClaims.containsKey("picture")) {
+      photo = tokenClaims.get("picture").toString().trim();
+    }
+
+    AppUserEntity entity = findOrCreateUserEntity(uid, email, name, photo);
+    entity.setAuthProvider(prov);
     userRepository.save(entity);
 
     return processUserLogin(uid, email, entity.getDisplayName(), entity.getPhotoUrl());
@@ -134,5 +163,18 @@ public class AuthController {
       user.setLastLoginAt(Instant.now());
       return userRepository.save(user);
     });
+  }
+
+  private Map<String, Object> parseJwtClaims(String token) {
+    if (token == null || token.isBlank()) return Map.of();
+    try {
+      String[] parts = token.split("\\.");
+      if (parts.length < 2) return Map.of();
+      String payload = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
+      com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+      return mapper.readValue(payload, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+    } catch (Exception e) {
+      return Map.of();
+    }
   }
 }

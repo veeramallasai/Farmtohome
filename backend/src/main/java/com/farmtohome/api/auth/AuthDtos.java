@@ -19,12 +19,14 @@ public class AuthDtos {
   ) {}
 
   public record SocialLoginRequest(
-      @NotBlank String provider,
-      @NotBlank @Email String email,
+      String provider,
+      String email,
       String firstName,
       String lastName,
       String photoUrl,
-      String idToken
+      String idToken,
+      String token,
+      String credential
   ) {}
 
   public record ForgotPasswordRequest(
