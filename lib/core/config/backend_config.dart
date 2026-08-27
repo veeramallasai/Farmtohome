@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb, kReleaseMode;
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 class BackendConfig {
   BackendConfig._();
@@ -29,19 +29,35 @@ class BackendConfig {
   );
 
   static String get baseUrl {
+    String url = _defaultProductionUrl;
     if (_overrideBaseUrl.trim().isNotEmpty) {
-      return _withoutTrailingSlash(_overrideBaseUrl.trim());
+      url = _overrideBaseUrl.trim();
+    } else if (_underscoreApiBaseUrl.trim().isNotEmpty) {
+      url = _underscoreApiBaseUrl.trim();
+    } else if (_apiUrl.trim().isNotEmpty) {
+      url = _apiUrl.trim();
+    } else if (_railwayUrl.trim().isNotEmpty) {
+      url = _railwayUrl.trim();
     }
-    if (_underscoreApiBaseUrl.trim().isNotEmpty) {
-      return _withoutTrailingSlash(_underscoreApiBaseUrl.trim());
+
+    url = _withoutTrailingSlash(url);
+
+    // Auto-correct loopback hosts based on running platform
+    if (kIsWeb) {
+      // Chrome/Web cannot connect to 10.0.2.2 (times out); map to localhost
+      if (url.contains('10.0.2.2')) {
+        url = url.replaceAll('10.0.2.2', 'localhost');
+      }
+    } else if (defaultTargetPlatform == TargetPlatform.android) {
+      // Android Emulator cannot connect to localhost directly; map to 10.0.2.2
+      if (url.contains('localhost')) {
+        url = url.replaceAll('localhost', '10.0.2.2');
+      } else if (url.contains('127.0.0.1')) {
+        url = url.replaceAll('127.0.0.1', '10.0.2.2');
+      }
     }
-    if (_apiUrl.trim().isNotEmpty) {
-      return _withoutTrailingSlash(_apiUrl.trim());
-    }
-    if (_railwayUrl.trim().isNotEmpty) {
-      return _withoutTrailingSlash(_railwayUrl.trim());
-    }
-    return _withoutTrailingSlash(_defaultProductionUrl);
+
+    return url;
   }
 
 

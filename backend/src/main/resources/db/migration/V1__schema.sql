@@ -48,7 +48,9 @@ CREATE TABLE IF NOT EXISTS coupons (
   discount_value numeric(12,2) NOT NULL,
   minimum_order numeric(12,2) NOT NULL DEFAULT 0,
   maximum_discount numeric(12,2) NOT NULL DEFAULT 0,
-  active boolean NOT NULL DEFAULT true
+  active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
 DO $$
 BEGIN
@@ -65,6 +67,8 @@ ALTER TABLE coupons ADD COLUMN IF NOT EXISTS discount_value numeric(12,2) NOT NU
 ALTER TABLE coupons ADD COLUMN IF NOT EXISTS minimum_order numeric(12,2) NOT NULL DEFAULT 0;
 ALTER TABLE coupons ADD COLUMN IF NOT EXISTS maximum_discount numeric(12,2) NOT NULL DEFAULT 0;
 ALTER TABLE coupons ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true;
+ALTER TABLE coupons ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE coupons ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 
 CREATE TABLE IF NOT EXISTS carts (
   owner_uid varchar(160) PRIMARY KEY,

@@ -16,7 +16,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * Filter placed at HIGHEST_PRECEDENCE to handle CORS preflight OPTIONS requests
- * immediately with 200 OK and valid CORS headers across all Railway deployed origins.
+ * immediately with 200 OK and valid CORS headers across all origins.
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -30,22 +30,23 @@ public class PreflightCorsFilter implements Filter {
 
         String origin = request.getHeader("Origin");
         if (origin == null || origin.trim().isEmpty()) {
-            origin = "https://flutter-frontend-production-e8d6.up.railway.app";
+            origin = "*";
         }
 
+        response.setHeader("Access-Control-Allow-Origin", origin);
+        response.setHeader("Access-Control-Allow-Credentials", "true");
+        response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD");
+        
+        String reqHeaders = request.getHeader("Access-Control-Request-Headers");
+        if (reqHeaders != null && !reqHeaders.trim().isEmpty()) {
+            response.setHeader("Access-Control-Allow-Headers", reqHeaders);
+        } else {
+            response.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept, X-Requested-With, Origin, Access-Control-Request-Method, Access-Control-Request-Headers");
+        }
+        
+        response.setHeader("Access-Control-Exposed-Headers", "Authorization, Content-Type, X-Total-Count, Access-Control-Allow-Origin, Access-Control-Allow-Credentials");
+
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
-            response.setHeader("Access-Control-Allow-Origin", origin);
-            response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD");
-            
-            String reqHeaders = request.getHeader("Access-Control-Request-Headers");
-            if (reqHeaders != null && !reqHeaders.trim().isEmpty()) {
-                response.setHeader("Access-Control-Allow-Headers", reqHeaders);
-            } else {
-                response.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept, X-Requested-With, Origin, Access-Control-Request-Method, Access-Control-Request-Headers");
-            }
-            
-            response.setHeader("Access-Control-Exposed-Headers", "Authorization, Content-Type, X-Total-Count, Access-Control-Allow-Origin, Access-Control-Allow-Credentials");
-            response.setHeader("Access-Control-Allow-Credentials", "true");
             response.setHeader("Access-Control-Max-Age", "3600");
             response.setStatus(HttpServletResponse.SC_OK);
             return;
@@ -54,3 +55,4 @@ public class PreflightCorsFilter implements Filter {
         chain.doFilter(req, res);
     }
 }
+
