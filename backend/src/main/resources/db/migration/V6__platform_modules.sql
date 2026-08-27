@@ -181,9 +181,9 @@ ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO offers (id, title, description, code, discount_type, discount_value, minimum_order, maximum_discount)
 VALUES
-  ('fresh10', 'Fresh 10% Off', 'Save on your first farm-fresh basket', 'FRESH10', 'percentage', 10, 299, 100),
-  ('farm50', '₹50 Farm Savings', 'Flat savings on orders above ₹499', 'FARM50', 'fixed', 50, 499, 0)
-ON CONFLICT (id) DO NOTHING;
+  ('33333333-3333-3333-3333-333333333333', 'Fresh 10% Off', 'Save on your first farm-fresh basket', 'FRESH10', 'percentage', 10, 299, 100),
+  ('44444444-4444-4444-4444-444444444444', '₹50 Farm Savings', 'Flat savings on orders above ₹499', 'FARM50', 'fixed', 50, 499, 0)
+ON CONFLICT (code) DO NOTHING;
 
 INSERT INTO farmers (id, name, farm_name, location, rating, review_count, verified, experience_years, speciality)
 VALUES
