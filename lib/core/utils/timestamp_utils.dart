@@ -33,15 +33,7 @@ class Timestamp {
   }
 }
 
-class FirebaseException implements Exception {
-  FirebaseException({required this.plugin, required this.message, this.code = 'unknown'});
-  final String plugin;
-  final String? message;
-  final String code;
 
-  @override
-  String toString() => '[$plugin/$code] $message';
-}
 
 class GeoPoint {
   const GeoPoint(this.latitude, this.longitude);

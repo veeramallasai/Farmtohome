@@ -5,7 +5,6 @@ import '../utils/timestamp_utils.dart';
 import 'package:http/http.dart' show ClientException;
 
 import 'app_exception.dart';
-import 'firestore_exception.dart';
 import 'network_exception.dart';
 
 class ErrorHandler {
@@ -15,9 +14,6 @@ class ErrorHandler {
     if (error is AppException) return error;
     if (error is BackendAuthException) {
       return BackendAuthException.fromCode(error.code, details: error.message);
-    }
-    if (error is FirebaseException) {
-      return FirestoreException.fromCode(error.code, details: error.message);
     }
     if (error is TimeoutException) return NetworkException.timeout;
     if (error is ClientException) {

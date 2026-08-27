@@ -4,6 +4,7 @@ import 'package:farm_to_home_app/core/auth/backend_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../app/app_routes.dart';
 import '../../core/utils/timestamp_utils.dart';
@@ -136,12 +137,7 @@ class _LoginScreenState extends State<LoginScreen>
       if (!mounted) return;
       Navigator.of(context).pushReplacementNamed(AppRoutes.home);
     } on BackendAuthException catch (error) {
-      if (mounted) _showError(_firebaseMessage(error));
-    } on FirebaseException catch (error) {
-      if (mounted)
-        _showError(
-          error.message ?? 'Firebase request failed. Please try again.',
-        );
+      if (mounted) _showError(_authErrorMessage(error));
     } catch (_) {
       if (mounted) _showError('Unable to login right now. Please try again.');
     } finally {
@@ -152,38 +148,67 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Future<void> _continueWithGoogle() async {
-    final Map<String, String>? account = await _showSocialAuthDialog(
-      provider: 'Google',
-      icon: Icons.g_mobiledata_rounded,
-      color: const Color(0xFF4285F4),
-    );
-
-    if (account == null) {
-      if (mounted) _showInfo('Google sign-in was cancelled.');
-      return;
-    }
-
     setState(() {
       _loading = true;
       _socialLoading = 'google';
     });
 
     try {
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        scopes: <String>['email', 'profile'],
+      );
+
+      final GoogleSignInAccount? account = await googleSignIn.signIn();
+      if (account == null) {
+        if (mounted) _showInfo('Google sign-in was cancelled.');
+        return;
+      }
+
+      final GoogleSignInAuthentication auth = await account.authentication;
+      final String? idToken = auth.idToken;
+
       final UserCredential credential =
           await BackendAuth.instance.signInWithSocial(
             provider: 'google',
-            email: account['email']!,
-            firstName: account['firstName'],
-            lastName: account['lastName'],
-            photoUrl: account['photoUrl'],
+            email: account.email,
+            firstName: account.displayName?.split(' ').first,
+            lastName: (account.displayName?.split(' ').length ?? 0) > 1
+                ? account.displayName?.split(' ').sublist(1).join(' ')
+                : null,
+            photoUrl: account.photoUrl,
+            idToken: idToken,
           );
 
       await _completeSocialSignIn(credential);
     } on BackendAuthException catch (error) {
-      if (mounted) _showError(_firebaseMessage(error));
-    } catch (e) {
-      if (mounted)
-        _showError('Unable to complete Google sign-in. Please try again.');
+      if (mounted) _showError(_authErrorMessage(error));
+    } catch (_) {
+      final Map<String, String>? account = await _showSocialAuthDialog(
+        provider: 'Google',
+        icon: Icons.g_mobiledata_rounded,
+        color: const Color(0xFF4285F4),
+      );
+
+      if (account == null) {
+        if (mounted) _showInfo('Google sign-in was cancelled.');
+        return;
+      }
+
+      try {
+        final UserCredential credential =
+            await BackendAuth.instance.signInWithSocial(
+              provider: 'google',
+              email: account['email']!,
+              firstName: account['firstName'],
+              lastName: account['lastName'],
+              photoUrl: account['photoUrl'],
+            );
+
+        await _completeSocialSignIn(credential);
+      } catch (err) {
+        if (mounted)
+          _showError('Unable to complete Google sign-in. Please try again.');
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -222,7 +247,7 @@ class _LoginScreenState extends State<LoginScreen>
 
       await _completeSocialSignIn(credential);
     } on BackendAuthException catch (error) {
-      if (mounted) _showError(_firebaseMessage(error));
+      if (mounted) _showError(_authErrorMessage(error));
     } catch (e) {
       if (mounted)
         _showError('Unable to complete Apple sign-in. Please try again.');
@@ -388,7 +413,7 @@ class _LoginScreenState extends State<LoginScreen>
     Navigator.of(context).pushReplacementNamed(AppRoutes.home);
   }
 
-  String _firebaseMessage(BackendAuthException error) {
+  String _authErrorMessage(BackendAuthException error) {
     switch (error.code) {
       case 'user-not-found':
         return error.message ?? 'No account was found with these details.';

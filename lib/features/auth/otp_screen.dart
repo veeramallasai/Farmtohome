@@ -164,7 +164,7 @@ class _OtpScreenState extends State<OtpScreen>
     } on BackendAuthException catch (error) {
       if (!mounted) return;
 
-      _showMessage(_firebaseMessage(error), error: true);
+      _showMessage(_authErrorMessage(error), error: true);
     } catch (_) {
       if (!mounted) return;
 
@@ -193,9 +193,9 @@ class _OtpScreenState extends State<OtpScreen>
       FlutterFire versions which expose linkWithPhoneNumber
       slightly differently on Web.
     */
-    final dynamic firebaseUser = user;
+    final dynamic authUser = user;
 
-    _webConfirmation = await firebaseUser.linkWithPhoneNumber(_formattedPhone);
+    _webConfirmation = await authUser.linkWithPhoneNumber(_formattedPhone);
 
     if (!mounted) return;
 
@@ -223,7 +223,7 @@ class _OtpScreenState extends State<OtpScreen>
       verificationFailed: (BackendAuthException error) {
         if (!mounted) return;
 
-        _showMessage(_firebaseMessage(error), error: true);
+        _showMessage(_authErrorMessage(error), error: true);
       },
 
       codeSent: (String verificationId, int? resendToken) {
@@ -272,7 +272,7 @@ class _OtpScreenState extends State<OtpScreen>
     } on BackendAuthException catch (error) {
       if (!mounted) return;
 
-      _showMessage(_firebaseMessage(error), error: true);
+      _showMessage(_authErrorMessage(error), error: true);
     } catch (error, stackTrace) {
       debugPrint('VERIFY OTP ERROR: $error\n$stackTrace');
       if (!mounted) return;
@@ -521,7 +521,7 @@ class _OtpScreenState extends State<OtpScreen>
     Navigator.of(context).pushReplacementNamed(AppRoutes.login);
   }
 
-  String _firebaseMessage(BackendAuthException error) {
+  String _authErrorMessage(BackendAuthException error) {
     switch (error.code) {
       case 'invalid-verification-code':
         return 'Incorrect OTP. Please try again.';
@@ -548,18 +548,18 @@ class _OtpScreenState extends State<OtpScreen>
         return 'Check your internet connection and try again.';
 
       case 'operation-not-allowed':
-        return 'Phone authentication is not enabled in Firebase.';
+        return 'Phone authentication is not enabled on this server.';
 
       case 'captcha-check-failed':
         return 'Security verification failed. Please try again.';
 
       case 'unauthorized-domain':
-        return 'This web domain is not authorized in Firebase Authentication.';
+        return 'This domain is not authorized for authentication.';
 
       case 'app-not-authorized':
       case 'invalid-app-credential':
       case 'missing-client-identifier':
-        return 'Phone OTP setup is incomplete. Add the Android SHA key and latest Firebase configuration.';
+        return 'Phone OTP setup is incomplete. Check server authentication configuration.';
 
       default:
         return error.message ?? 'OTP verification failed.';
