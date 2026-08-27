@@ -25,7 +25,7 @@ class BackendConfig {
 
   static const String _defaultProductionUrl = String.fromEnvironment(
     'PROD_BACKEND_URL',
-    defaultValue: 'https://farm-to-home-backend.up.railway.app',
+    defaultValue: 'https://farmtohome-backend-production-3378.up.railway.app',
   );
 
   static String get baseUrl {
