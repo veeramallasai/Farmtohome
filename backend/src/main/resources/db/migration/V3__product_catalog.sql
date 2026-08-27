@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS products (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+ALTER TABLE products ALTER COLUMN id TYPE varchar(120) USING id::text;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS category varchar(80) NOT NULL DEFAULT 'vegetables';
 ALTER TABLE products ADD COLUMN IF NOT EXISTS english_name varchar(160) NOT NULL DEFAULT '';
 ALTER TABLE products ADD COLUMN IF NOT EXISTS telugu_name varchar(160) NOT NULL DEFAULT '';
