@@ -40,24 +40,7 @@ class BackendConfig {
       url = _railwayUrl.trim();
     }
 
-    url = _withoutTrailingSlash(url);
-
-    // Auto-correct loopback hosts based on running platform
-    if (kIsWeb) {
-      // Chrome/Web cannot connect to 10.0.2.2 (times out); map to localhost
-      if (url.contains('10.0.2.2')) {
-        url = url.replaceAll('10.0.2.2', 'localhost');
-      }
-    } else if (defaultTargetPlatform == TargetPlatform.android) {
-      // Android Emulator cannot connect to localhost directly; map to 10.0.2.2
-      if (url.contains('localhost')) {
-        url = url.replaceAll('localhost', '10.0.2.2');
-      } else if (url.contains('127.0.0.1')) {
-        url = url.replaceAll('127.0.0.1', '10.0.2.2');
-      }
-    }
-
-    return url;
+    return _withoutTrailingSlash(url);
   }
 
 
