@@ -24,7 +24,7 @@ COPY --from=backend-builder /app/backend/target/*.jar /app/app.jar
 COPY --from=frontend-builder /app/build/web /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/nginx.conf
 
-EXPOSE 80 8081
+EXPOSE 80 8085
 
-# Boot Java Spring Boot API on 8081 and Nginx Reverse Proxy on Railway's $PORT
-CMD ["sh", "-c", "SERVER_PORT=8081 java -jar /app/app.jar & sed -i 's/listen 80;/listen '\"${PORT:-80}\"';/g' /etc/nginx/nginx.conf && sed -i 's/listen \\[::\\]:80;/listen \\[::\\]:'\"${PORT:-80}\"';/g' /etc/nginx/nginx.conf && nginx -g 'daemon off;'"]
+# Boot Java Spring Boot API on port 8085 and Nginx Reverse Proxy on Railway's $PORT
+CMD ["sh", "-c", "SERVER_PORT=8085 java -jar /app/app.jar & sed -i 's/listen 80;/listen '\"${PORT:-80}\"';/g' /etc/nginx/nginx.conf && sed -i 's/listen \\[::\\]:80;/listen \\[::\\]:'\"${PORT:-80}\"';/g' /etc/nginx/nginx.conf && nginx -g 'daemon off;'"]
