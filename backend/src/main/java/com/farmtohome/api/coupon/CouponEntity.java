@@ -25,6 +25,8 @@ public class CouponEntity {
   private BigDecimal maximumDiscount;
   @Column(nullable = false)
   private boolean active;
+  @Column(nullable = false)
+  private boolean deleted = false;
 
   public String getId() { return id; }
   public String getCode() { return code; }
@@ -34,4 +36,5 @@ public class CouponEntity {
   public BigDecimal getMinimumOrder() { return minimumOrder; }
   public BigDecimal getMaximumDiscount() { return maximumDiscount; }
   public boolean isActive() { return active; }
+  public boolean isDeleted() { return deleted; }
 }

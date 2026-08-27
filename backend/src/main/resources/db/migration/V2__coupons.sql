@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS coupons (
   minimum_order numeric(12,2) NOT NULL DEFAULT 0,
   maximum_discount numeric(12,2) NOT NULL DEFAULT 0,
   active boolean NOT NULL DEFAULT true,
+  deleted boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -20,6 +21,7 @@ BEGIN
   END;
 END $$;
 
+ALTER TABLE coupons ADD COLUMN IF NOT EXISTS deleted boolean NOT NULL DEFAULT false;
 ALTER TABLE coupons ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE coupons ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
@@ -48,7 +50,7 @@ EXCEPTION
   WHEN OTHERS THEN NULL;
 END $$;
 
--- use WHERE NOT EXISTS instead of ON CONFLICT so this works even if the unique constraint is still missing
+-- Single INSERT per coupon with deleted set to false
 INSERT INTO coupons (
     id,
     code,
@@ -58,6 +60,7 @@ INSERT INTO coupons (
     minimum_order,
     maximum_discount,
     active,
+    deleted,
     created_at,
     updated_at
 )
@@ -70,6 +73,7 @@ SELECT
     299,
     100,
     true,
+    false,
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP
 WHERE NOT EXISTS (
@@ -85,6 +89,7 @@ INSERT INTO coupons (
     minimum_order,
     maximum_discount,
     active,
+    deleted,
     created_at,
     updated_at
 )
@@ -97,6 +102,7 @@ SELECT
     499,
     50,
     true,
+    false,
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP
 WHERE NOT EXISTS (
