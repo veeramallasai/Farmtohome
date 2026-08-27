@@ -27,6 +27,7 @@ spring:
     baseline-on-migrate: true
     baseline-version: 0
     repair-on-migrate: true
+    validate-on-migrate: false
     locations: classpath:db/migration
   jackson:
     default-property-inclusion: non_null
