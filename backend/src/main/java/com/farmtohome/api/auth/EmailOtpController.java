@@ -1,13 +1,16 @@
 package com.farmtohome.api.auth;
 
+import com.farmtohome.api.common.ApiException;
 import com.farmtohome.api.common.ApiResponse;
 import jakarta.validation.Valid;
 import java.security.Principal;
 import java.util.Map;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -20,37 +23,62 @@ public class EmailOtpController {
   }
 
   @PostMapping("/send")
-  ApiResponse<Map<String, Object>> send(Principal principal) {
-    return ApiResponse.ok(service.send(principal.getName()), "Email OTP sent.");
+  public ApiResponse<Map<String, Object>> send(
+      Principal principal,
+      @RequestBody(required = false) EmailOtpDtos.RequestOtpRequest request) {
+    String email = (request != null && request.email() != null && !request.email().isBlank())
+        ? request.email().trim().toLowerCase()
+        : (principal != null ? principal.getName() : null);
+
+    if (email == null || email.isBlank()) {
+      throw new ApiException(HttpStatus.BAD_REQUEST, "Email address is required.");
+    }
+    return ApiResponse.ok(service.sendForEmail(email), "Email OTP sent.");
   }
 
   @PostMapping("/verify")
-  ApiResponse<Map<String, Object>> verify(
+  public ApiResponse<Map<String, Object>> verify(
       Principal principal,
       @Valid @RequestBody EmailOtpDtos.VerifyRequest request) {
+    String email = (request.email() != null && !request.email().isBlank())
+        ? request.email().trim().toLowerCase()
+        : (principal != null ? principal.getName() : null);
+
+    if (email == null || email.isBlank()) {
+      throw new ApiException(HttpStatus.BAD_REQUEST, "Email address is required.");
+    }
     return ApiResponse.ok(
-        service.verify(principal.getName(), request.otp()),
+        service.verifyForEmail(email, request.otp()),
         "Email verified successfully.");
   }
 
   @GetMapping("/status")
-  ApiResponse<Map<String, Object>> status(Principal principal) {
-    return ApiResponse.ok(service.status(principal.getName()));
+  public ApiResponse<Map<String, Object>> status(
+      Principal principal,
+      @RequestParam(required = false) String email) {
+    String target = (email != null && !email.isBlank())
+        ? email.trim().toLowerCase()
+        : (principal != null ? principal.getName() : null);
+
+    if (target == null) {
+      return ApiResponse.ok(Map.of("email", "", "verified", false));
+    }
+    return ApiResponse.ok(service.statusForEmail(target));
   }
 
   @PostMapping("/request")
-  ApiResponse<Map<String, Object>> request(
+  public ApiResponse<Map<String, Object>> request(
       @Valid @RequestBody EmailOtpDtos.RequestOtpRequest request) {
     return ApiResponse.ok(
-        service.sendForEmail(request.email()),
+        service.sendForEmail(request.email().trim().toLowerCase()),
         "Email OTP sent.");
   }
 
   @PostMapping("/verify-reset")
-  ApiResponse<Map<String, Object>> verifyReset(
+  public ApiResponse<Map<String, Object>> verifyReset(
       @Valid @RequestBody EmailOtpDtos.VerifyResetRequest request) {
     return ApiResponse.ok(
-        service.verifyForEmail(request.email(), request.otp()),
+        service.verifyForEmail(request.email().trim().toLowerCase(), request.otp().trim()),
         "Email verified successfully.");
   }
 }

@@ -28,10 +28,10 @@ spring:
   jackson:
     default-property-inclusion: non_null
   mail:
-    host: ${MAIL_HOST:smtp.gmail.com}
-    port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:}
-    password: ${MAIL_PASSWORD:}
+    host: ${MAIL_HOST:${SPRING_MAIL_HOST:${SMTP_HOST:smtp.gmail.com}}}
+    port: ${MAIL_PORT:${SPRING_MAIL_PORT:${SMTP_PORT:587}}}
+    username: ${MAIL_USERNAME:${SPRING_MAIL_USERNAME:${SMTP_USER:${SMTP_USERNAME:}}}}
+    password: ${MAIL_PASSWORD:${SPRING_MAIL_PASSWORD:${SMTP_PASS:${SMTP_PASSWORD:}}}}
     properties:
       mail:
         smtp:

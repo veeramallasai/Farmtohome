@@ -6,24 +6,38 @@ class EmailOtpRepository {
 
   final ApiClient _apiClient;
 
-  Future<Map<String, dynamic>> sendOtp() async {
-    final dynamic data =
-        (await _apiClient.post('/api/v1/auth/email-otp/send')).data;
-    return _map(data);
-  }
-
-  Future<Map<String, dynamic>> verifyOtp(String otp) async {
+  Future<Map<String, dynamic>> sendOtp([String? email]) async {
     final dynamic data =
         (await _apiClient.post(
-          '/api/v1/auth/email-otp/verify',
-          body: <String, dynamic>{'otp': otp.trim()},
+          '/api/v1/auth/email-otp/send',
+          body: email != null && email.trim().isNotEmpty
+              ? <String, dynamic>{'email': email.trim().toLowerCase()}
+              : null,
         )).data;
     return _map(data);
   }
 
-  Future<Map<String, dynamic>> status() async {
+  Future<Map<String, dynamic>> verifyOtp(String otp, [String? email]) async {
     final dynamic data =
-        (await _apiClient.get('/api/v1/auth/email-otp/status')).data;
+        (await _apiClient.post(
+          '/api/v1/auth/email-otp/verify',
+          body: <String, dynamic>{
+            'otp': otp.trim(),
+            if (email != null && email.trim().isNotEmpty)
+              'email': email.trim().toLowerCase(),
+          },
+        )).data;
+    return _map(data);
+  }
+
+  Future<Map<String, dynamic>> status([String? email]) async {
+    final dynamic data =
+        (await _apiClient.get(
+          '/api/v1/auth/email-otp/status',
+          queryParameters: email != null && email.trim().isNotEmpty
+              ? <String, dynamic>{'email': email.trim().toLowerCase()}
+              : null,
+        )).data;
     return _map(data);
   }
 

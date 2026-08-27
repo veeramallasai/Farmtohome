@@ -147,35 +147,7 @@ class _OtpScreenState extends State<OtpScreen>
   }
 
   Future<void> _sendOtp({bool resend = false}) async {
-    if (_sendingOtp || _verifyingOtp) {
-      return;
-    }
-
-    setState(() {
-      _sendingOtp = true;
-    });
-
-    try {
-      if (kIsWeb) {
-        await _sendWebOtp();
-      } else {
-        await _sendNativeOtp(resend: resend);
-      }
-    } on BackendAuthException catch (error) {
-      if (!mounted) return;
-
-      _showMessage(_authErrorMessage(error), error: true);
-    } catch (_) {
-      if (!mounted) return;
-
-      _showMessage('Unable to send OTP. Please try again.', error: true);
-    } finally {
-      if (mounted) {
-        setState(() {
-          _sendingOtp = false;
-        });
-      }
-    }
+    await _sendEmailOtp(resend: resend);
   }
 
   Future<void> _sendWebOtp() async {
@@ -467,7 +439,7 @@ class _OtpScreenState extends State<OtpScreen>
   Future<void> _verifyEmailOtp(String otp) async {
     final User? currentUser = BackendAuth.instance.currentUser;
     if (currentUser != null) {
-      await _emailOtpRepository.verifyOtp(otp);
+      await _emailOtpRepository.verifyOtp(otp, _emailAddress);
 
       final String uid =
           widget.userId?.trim().isNotEmpty == true

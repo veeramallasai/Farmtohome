@@ -8,6 +8,7 @@ public final class EmailOtpDtos {
   private EmailOtpDtos() {}
 
   public record VerifyRequest(
+      String email,
       @NotBlank
       @Pattern(regexp = "\\d{6}", message = "OTP must be exactly 6 digits.")
       String otp) {}
