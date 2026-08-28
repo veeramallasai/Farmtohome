@@ -49,6 +49,9 @@ class BackendConfig {
     }
 
     String cleaned = _withoutTrailingSlash(url);
+    if (!cleaned.startsWith('http://') && !cleaned.startsWith('https://')) {
+      cleaned = 'https://$cleaned';
+    }
     if (!cleaned.endsWith('/api/v1') && !cleaned.contains('/api/')) {
       cleaned = '$cleaned/api/v1';
     }

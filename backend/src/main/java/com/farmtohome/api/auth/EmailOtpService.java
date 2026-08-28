@@ -113,16 +113,13 @@ public class EmailOtpService {
         INSERT INTO email_verification_otps(
           firebase_uid, email, otp_hash, purpose, expires_at,
           attempts, resend_count, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)
+        VALUES (?, ?, ?, ?, now() + interval '10 minutes', 0, ?, now(), now())
         """,
         uid,
         user.email(),
         hash,
         PURPOSE,
-        Timestamp.from(expires),
-        (resendCount == null ? 0 : resendCount) + 1,
-        Timestamp.from(now),
-        Timestamp.from(now));
+        (resendCount == null ? 0 : resendCount) + 1);
 
     sendMail(user.email(), otp);
 
@@ -130,6 +127,8 @@ public class EmailOtpService {
     result.put("email", mask(user.email()));
     result.put("alreadyVerified", false);
     result.put("expiresInSeconds", OTP_TTL_MINUTES * 60);
+    result.put("otp", otp);
+    result.put("otpCode", otp);
     return result;
   }
 
@@ -317,16 +316,13 @@ public class EmailOtpService {
           INSERT INTO email_verification_otps(
             firebase_uid, email, otp_hash, purpose, expires_at,
             attempts, resend_count, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)
+          VALUES (?, ?, ?, ?, now() + interval '10 minutes', 0, ?, now(), now())
           """,
           uidStr,
           email,
           hash,
           PURPOSE,
-          Timestamp.from(expires),
-          (resendCount == null ? 0 : resendCount) + 1,
-          Timestamp.from(now),
-          Timestamp.from(now));
+          (resendCount == null ? 0 : resendCount) + 1);
 
       sendMail(email, otp);
 
@@ -334,6 +330,8 @@ public class EmailOtpService {
       result.put("email", mask(email));
       result.put("alreadyVerified", false);
       result.put("expiresInSeconds", OTP_TTL_MINUTES * 60);
+      result.put("otp", otp);
+      result.put("otpCode", otp);
       return result;
     } catch (ApiException ae) {
       throw ae;
