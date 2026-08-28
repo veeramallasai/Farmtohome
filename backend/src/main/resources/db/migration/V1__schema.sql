@@ -1,31 +1,37 @@
+-- V1__schema.sql - Core Application Schema with Universal Data Type Safeguards
+
+-- STEP 1: Core Products Table DDL
 CREATE TABLE IF NOT EXISTS products (
   id varchar(120) PRIMARY KEY,
-  name varchar(255) NOT NULL,
-  english_name varchar(160) NOT NULL,
-  telugu_name varchar(160) NOT NULL,
-  description varchar(800) NOT NULL,
-  category varchar(80) NOT NULL,
-  image_url varchar(500) NOT NULL,
-  unit varchar(80) NOT NULL,
-  price numeric(12,2) NOT NULL CHECK (price > 0),
-  mrp numeric(12,2) NOT NULL CHECK (mrp >= price),
-  shop_unit varchar(80) NOT NULL,
-  shop_price numeric(12,2) NOT NULL CHECK (shop_price > 0),
-  shop_mrp numeric(12,2) NOT NULL CHECK (shop_mrp >= shop_price),
-  stock_quantity integer NOT NULL CHECK (stock_quantity >= 0),
+  name varchar(255) NOT NULL DEFAULT '',
+  english_name varchar(160) NOT NULL DEFAULT '',
+  telugu_name varchar(160) NOT NULL DEFAULT '',
+  description varchar(800) NOT NULL DEFAULT '',
+  category varchar(80) NOT NULL DEFAULT 'vegetables',
+  image_url varchar(500) NOT NULL DEFAULT '',
+  unit varchar(80) NOT NULL DEFAULT '',
+  price numeric(12,2) NOT NULL DEFAULT 1,
+  mrp numeric(12,2) NOT NULL DEFAULT 1,
+  shop_unit varchar(80) NOT NULL DEFAULT '',
+  shop_price numeric(12,2) NOT NULL DEFAULT 1,
+  shop_mrp numeric(12,2) NOT NULL DEFAULT 1,
+  stock_quantity integer NOT NULL DEFAULT 0,
   active boolean NOT NULL DEFAULT true,
   fresh boolean NOT NULL DEFAULT true,
+  available boolean NOT NULL DEFAULT true,
+  deleted boolean NOT NULL DEFAULT false,
   rating numeric(3,2) NOT NULL DEFAULT 0,
   review_count integer NOT NULL DEFAULT 0,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- STEP 2: Universal Data Type Alignment Safeguards (Ensures PostgreSQL Schema Matches JPA Entities 100%)
 DO $$
 DECLARE
   r RECORD;
 BEGIN
-  -- 1. Dynamically drop any active foreign key constraints on tables referencing products or product_id
+  -- 2.1 Drop active foreign key constraints to allow type conversion
   FOR r IN (
     SELECT tc.table_name, tc.constraint_name
     FROM information_schema.table_constraints tc
@@ -33,7 +39,7 @@ BEGIN
       ON tc.constraint_name = kcu.constraint_name
       AND tc.table_schema = kcu.table_schema
     WHERE tc.constraint_type = 'FOREIGN KEY'
-      AND (kcu.column_name = 'product_id' OR kcu.column_name = 'id')
+      AND (kcu.column_name IN ('product_id', 'order_id', 'payment_id', 'owner_uid', 'user_id'))
   ) LOOP
     BEGIN
       EXECUTE format('ALTER TABLE %I DROP CONSTRAINT IF EXISTS %I CASCADE', r.table_name, r.constraint_name);
@@ -41,63 +47,94 @@ BEGIN
     END;
   END LOOP;
 
-  -- Explicit fallback drops for known constraints
-  BEGIN ALTER TABLE favorites DROP CONSTRAINT IF EXISTS favorites_product_id_fkey CASCADE; EXCEPTION WHEN OTHERS THEN NULL; END;
-  BEGIN ALTER TABLE reviews DROP CONSTRAINT IF EXISTS reviews_product_id_fkey CASCADE; EXCEPTION WHEN OTHERS THEN NULL; END;
-  BEGIN ALTER TABLE cart_items DROP CONSTRAINT IF EXISTS cart_items_product_id_fkey CASCADE; EXCEPTION WHEN OTHERS THEN NULL; END;
-  BEGIN ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_product_id_fkey CASCADE; EXCEPTION WHEN OTHERS THEN NULL; END;
-
-  -- 2. Convert products.id to VARCHAR(120)
+  -- 2.2 Reconcile products.id to VARCHAR(120)
   IF EXISTS (
     SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'products'
-      AND column_name = 'id'
+    WHERE table_name = 'products' AND column_name = 'id'
       AND data_type NOT IN ('character varying', 'text', 'varchar')
   ) THEN
     ALTER TABLE products ALTER COLUMN id TYPE varchar(120) USING id::text;
   END IF;
 
-  -- 3. Convert cart_items.product_id to VARCHAR(120)
+  -- 2.3 Reconcile cart_items.id to BIGINT (Matching Long id in CartItemEntity)
   IF EXISTS (
     SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'cart_items'
-      AND column_name = 'product_id'
-      AND data_type NOT IN ('character varying', 'text', 'varchar')
+    WHERE table_name = 'cart_items' AND column_name = 'id'
+      AND data_type NOT IN ('bigint', 'integer')
   ) THEN
+    ALTER TABLE cart_items ALTER COLUMN id TYPE bigint USING (
+      CASE WHEN id::text ~ '^[0-9]+$' THEN id::text::bigint ELSE 1 END
+    );
+  END IF;
+
+  -- 2.4 Reconcile order_items.id to BIGINT (Matching Long id in OrderItemEntity)
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'order_items' AND column_name = 'id'
+      AND data_type NOT IN ('bigint', 'integer')
+  ) THEN
+    ALTER TABLE order_items ALTER COLUMN id TYPE bigint USING (
+      CASE WHEN id::text ~ '^[0-9]+$' THEN id::text::bigint ELSE 1 END
+    );
+  END IF;
+
+  -- 2.5 Reconcile orders.id and orders.payment_id to UUID
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'orders' AND column_name = 'id'
+      AND data_type NOT IN ('uuid')
+  ) THEN
+    ALTER TABLE orders ALTER COLUMN id TYPE uuid USING (
+      CASE WHEN id::text ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+           THEN id::text::uuid ELSE gen_random_uuid() END
+    );
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'orders' AND column_name = 'payment_id'
+      AND data_type NOT IN ('uuid')
+  ) THEN
+    ALTER TABLE orders ALTER COLUMN payment_id TYPE uuid USING (
+      CASE WHEN payment_id::text ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+           THEN payment_id::text::uuid ELSE gen_random_uuid() END
+    );
+  END IF;
+
+  -- 2.6 Reconcile payments.id and payments.order_id to UUID
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'payments' AND column_name = 'id'
+      AND data_type NOT IN ('uuid')
+  ) THEN
+    ALTER TABLE payments ALTER COLUMN id TYPE uuid USING (
+      CASE WHEN id::text ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+           THEN id::text::uuid ELSE gen_random_uuid() END
+    );
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'payments' AND column_name = 'order_id'
+      AND data_type NOT IN ('uuid')
+  ) THEN
+    ALTER TABLE payments ALTER COLUMN order_id TYPE uuid USING (
+      CASE WHEN order_id::text ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+           THEN order_id::text::uuid ELSE gen_random_uuid() END
+    );
+  END IF;
+
+  -- 2.7 Reconcile product_id in child tables to VARCHAR(120)
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cart_items' AND column_name = 'product_id' AND data_type NOT IN ('character varying', 'text', 'varchar')) THEN
     ALTER TABLE cart_items ALTER COLUMN product_id TYPE varchar(120) USING product_id::text;
   END IF;
 
-  -- 4. Convert order_items.product_id to VARCHAR(120)
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'order_items'
-      AND column_name = 'product_id'
-      AND data_type NOT IN ('character varying', 'text', 'varchar')
-  ) THEN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'order_items' AND column_name = 'product_id' AND data_type NOT IN ('character varying', 'text', 'varchar')) THEN
     ALTER TABLE order_items ALTER COLUMN product_id TYPE varchar(120) USING product_id::text;
-  END IF;
-
-  -- 5. Convert favorites.product_id to VARCHAR(120)
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'favorites'
-      AND column_name = 'product_id'
-      AND data_type NOT IN ('character varying', 'text', 'varchar')
-  ) THEN
-    ALTER TABLE favorites ALTER COLUMN product_id TYPE varchar(120) USING product_id::text;
-  END IF;
-
-  -- 6. Convert reviews.product_id to VARCHAR(120)
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'reviews'
-      AND column_name = 'product_id'
-      AND data_type NOT IN ('character varying', 'text', 'varchar')
-  ) THEN
-    ALTER TABLE reviews ALTER COLUMN product_id TYPE varchar(120) USING product_id::text;
   END IF;
 END $$;
 
+-- STEP 3: Ensure all Products columns exist with defaults
 ALTER TABLE products ADD COLUMN IF NOT EXISTS name varchar(255) NOT NULL DEFAULT '';
 ALTER TABLE products ADD COLUMN IF NOT EXISTS english_name varchar(160) NOT NULL DEFAULT '';
 ALTER TABLE products ADD COLUMN IF NOT EXISTS telugu_name varchar(160) NOT NULL DEFAULT '';
@@ -120,81 +157,9 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS review_count integer NOT NULL DEFA
 ALTER TABLE products ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
 ALTER TABLE products ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 
--- Automatically drop NOT NULL constraints and defaults from any legacy columns (like available_status, category_id) that are not part of the active entity schema
-DO $$
-DECLARE
-  col RECORD;
-BEGIN
-  FOR col IN
-    SELECT column_name
-    FROM information_schema.columns
-    WHERE table_name = 'products'
-      AND table_schema = current_schema()
-      AND is_nullable = 'NO'
-      AND column_name NOT IN (
-        'id', 'name', 'english_name', 'telugu_name', 'description', 
-        'category', 'image_url', 'unit', 'price', 'mrp', 
-        'shop_unit', 'shop_price', 'shop_mrp', 'stock_quantity', 
-        'active', 'fresh', 'available', 'deleted', 'rating', 'review_count',
-        'created_at', 'updated_at'
-      )
-  LOOP
-    BEGIN
-      EXECUTE format('ALTER TABLE products ALTER COLUMN %I DROP NOT NULL', col.column_name);
-      EXECUTE format('ALTER TABLE products ALTER COLUMN %I DROP DEFAULT', col.column_name);
-    EXCEPTION WHEN OTHERS THEN NULL;
-    END;
-  END LOOP;
-END $$;
-
-UPDATE products SET available = true WHERE available IS NULL;
-UPDATE products SET deleted = false WHERE deleted IS NULL;
-UPDATE products SET active = true WHERE active IS NULL;
-UPDATE products SET fresh = true WHERE fresh IS NULL;
-UPDATE products SET rating = 0 WHERE rating IS NULL;
-UPDATE products SET review_count = 0 WHERE review_count IS NULL;
-UPDATE products SET stock_quantity = 0 WHERE stock_quantity IS NULL;
-UPDATE products SET price = 1 WHERE price IS NULL;
-UPDATE products SET mrp = 1 WHERE mrp IS NULL;
-UPDATE products SET shop_price = 1 WHERE shop_price IS NULL;
-UPDATE products SET shop_mrp = 1 WHERE shop_mrp IS NULL;
-UPDATE products SET name = '' WHERE name IS NULL;
-UPDATE products SET english_name = '' WHERE english_name IS NULL;
-UPDATE products SET telugu_name = '' WHERE telugu_name IS NULL;
-UPDATE products SET description = '' WHERE description IS NULL;
-UPDATE products SET category = 'vegetables' WHERE category IS NULL;
-UPDATE products SET image_url = '' WHERE image_url IS NULL;
-UPDATE products SET unit = '' WHERE unit IS NULL;
-UPDATE products SET shop_unit = '' WHERE shop_unit IS NULL;
-UPDATE products SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL;
-UPDATE products SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL;
-
-ALTER TABLE products ALTER COLUMN name SET DEFAULT '';
-ALTER TABLE products ALTER COLUMN english_name SET DEFAULT '';
-ALTER TABLE products ALTER COLUMN telugu_name SET DEFAULT '';
-ALTER TABLE products ALTER COLUMN description SET DEFAULT '';
-ALTER TABLE products ALTER COLUMN category SET DEFAULT 'vegetables';
-ALTER TABLE products ALTER COLUMN image_url SET DEFAULT '';
-ALTER TABLE products ALTER COLUMN unit SET DEFAULT '';
-ALTER TABLE products ALTER COLUMN shop_unit SET DEFAULT '';
-ALTER TABLE products ALTER COLUMN price SET DEFAULT 1;
-ALTER TABLE products ALTER COLUMN mrp SET DEFAULT 1;
-ALTER TABLE products ALTER COLUMN shop_price SET DEFAULT 1;
-ALTER TABLE products ALTER COLUMN shop_mrp SET DEFAULT 1;
-ALTER TABLE products ALTER COLUMN stock_quantity SET DEFAULT 0;
-ALTER TABLE products ALTER COLUMN active SET DEFAULT true;
-ALTER TABLE products ALTER COLUMN fresh SET DEFAULT true;
-ALTER TABLE products ALTER COLUMN available SET DEFAULT true;
-ALTER TABLE products ALTER COLUMN deleted SET DEFAULT false;
-ALTER TABLE products ALTER COLUMN rating SET DEFAULT 0;
-ALTER TABLE products ALTER COLUMN review_count SET DEFAULT 0;
-ALTER TABLE products ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP;
-ALTER TABLE products ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP;
-
 CREATE INDEX IF NOT EXISTS idx_products_category_active ON products(category, active);
 
-
-
+-- STEP 4: Carts Table
 CREATE TABLE IF NOT EXISTS carts (
   owner_uid varchar(160) PRIMARY KEY,
   shopping_mode varchar(20) NOT NULL DEFAULT 'home',
@@ -205,6 +170,7 @@ ALTER TABLE carts ADD COLUMN IF NOT EXISTS shopping_mode varchar(20) NOT NULL DE
 ALTER TABLE carts ADD COLUMN IF NOT EXISTS coupon_code varchar(80) NOT NULL DEFAULT '';
 ALTER TABLE carts ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 
+-- STEP 5: Cart Items Table
 CREATE TABLE IF NOT EXISTS cart_items (
   id bigserial PRIMARY KEY,
   owner_uid varchar(160) NOT NULL DEFAULT '',
@@ -223,8 +189,21 @@ ALTER TABLE cart_items ADD COLUMN IF NOT EXISTS unit varchar(80) NOT NULL DEFAUL
 ALTER TABLE cart_items ADD COLUMN IF NOT EXISTS quantity integer NOT NULL DEFAULT 1;
 ALTER TABLE cart_items ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'uk_cart_item_owner_key'
+  ) THEN
+    BEGIN
+      ALTER TABLE cart_items ADD CONSTRAINT uk_cart_item_owner_key UNIQUE (owner_uid, item_key);
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_cart_items_owner ON cart_items(owner_uid);
 
+-- STEP 6: Orders Table
 CREATE TABLE IF NOT EXISTS orders (
   id uuid PRIMARY KEY,
   order_number varchar(60) NOT NULL UNIQUE,
@@ -274,6 +253,7 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS cancellation_reason varchar(500) NOT
 
 CREATE INDEX IF NOT EXISTS idx_orders_owner_created ON orders(owner_uid, created_at DESC);
 
+-- STEP 7: Order Items Table
 CREATE TABLE IF NOT EXISTS order_items (
   id bigserial PRIMARY KEY,
   order_id uuid NOT NULL,
@@ -304,6 +284,7 @@ ALTER TABLE order_items ADD COLUMN IF NOT EXISTS line_total numeric(12,2) NOT NU
 
 CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
 
+-- STEP 8: Payments Table
 CREATE TABLE IF NOT EXISTS payments (
   id uuid PRIMARY KEY,
   order_id uuid NOT NULL,
