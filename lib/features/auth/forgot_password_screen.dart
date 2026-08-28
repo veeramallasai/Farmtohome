@@ -178,7 +178,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
 
     try {
       final String email = _identifierController.text.trim().toLowerCase();
-      await BackendAuth.instance.sendPasswordResetEmail(email: email);
+      final Map<String, dynamic>? res =
+          await BackendAuth.instance.sendPasswordResetEmail(email: email);
+
+      final String? returnedOtp = (res?['otp'] ?? res?['otpCode'])?.toString();
+      if (returnedOtp != null && returnedOtp.trim().isNotEmpty) {
+        _otpController.text = returnedOtp.trim();
+      }
 
       if (!mounted) return;
 

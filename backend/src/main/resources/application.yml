@@ -32,10 +32,10 @@ spring:
   jackson:
     default-property-inclusion: non_null
   mail:
-    host: smtp.gmail.com
-    port: 587
-    username: veeramallasaipichaiah456@gmail.com
-    password: hinnvjmxxziliiim
+    host: ${SPRING_MAIL_HOST:${MAIL_HOST:smtp.gmail.com}}
+    port: ${SPRING_MAIL_PORT:${MAIL_PORT:587}}
+    username: ${SPRING_MAIL_USERNAME:${MAIL_USERNAME:veeramallasaipichaiah456@gmail.com}}
+    password: ${SPRING_MAIL_PASSWORD:${MAIL_PASSWORD:hinnvjmxxziliiim}}
     properties:
       mail:
         smtp:
@@ -45,6 +45,9 @@ spring:
             required: true
           ssl:
             trust: smtp.gmail.com
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
 
 management:
   endpoints:

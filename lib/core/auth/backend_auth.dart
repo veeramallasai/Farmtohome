@@ -214,18 +214,28 @@ class BackendAuth {
     (onFailed ?? verificationFailed)?.call(error);
   }
 
-  Future<void> sendPasswordResetEmail({required String email}) async =>
-      _apiClient.post(
-        '/api/v1/auth/forgot-password',
-        body: <String, dynamic>{'email': email.trim().toLowerCase()},
-      );
-  Future<void> sendEmailOtp([String? email]) async {
+  Future<Map<String, dynamic>?> sendPasswordResetEmail({required String email}) async {
+    final response = await _apiClient.post(
+      '/api/v1/auth/forgot-password',
+      body: <String, dynamic>{'email': email.trim().toLowerCase()},
+    );
+    if (response.data is Map) {
+      return Map<String, dynamic>.from(response.data as Map);
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> sendEmailOtp([String? email]) async {
     final String targetEmail =
         (email ?? _currentUser?.email ?? '').trim().toLowerCase();
-    await _apiClient.post(
+    final response = await _apiClient.post(
       '/api/v1/auth/email-otp/send',
       body: <String, dynamic>{'email': targetEmail},
     );
+    if (response.data is Map) {
+      return Map<String, dynamic>.from(response.data as Map);
+    }
+    return null;
   }
 
   Future<void> verifyResetOtp({
