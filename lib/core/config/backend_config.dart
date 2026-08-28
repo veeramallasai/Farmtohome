@@ -48,6 +48,21 @@ class BackendConfig {
       url = _defaultProductionUrl;
     }
 
+    return _sanitizeUrl(url);
+  }
+
+  static String _sanitizeUrl(String raw) {
+    String url = raw.trim();
+    if (url.contains('farmtohome-backend')) {
+      final int idx = url.indexOf('farmtohome-backend');
+      url = 'https://${url.substring(idx)}';
+    } else if (url.contains('http://') || url.contains('https://')) {
+      final int lastHttp = url.lastIndexOf('http');
+      if (lastHttp > 0) {
+        url = url.substring(lastHttp);
+      }
+    }
+
     String cleaned = _withoutTrailingSlash(url);
     if (!cleaned.startsWith('http://') && !cleaned.startsWith('https://')) {
       cleaned = 'https://$cleaned';
