@@ -17,7 +17,7 @@ class ProductOfferSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (product.discountPercent <= 0 && couponCode.trim().isEmpty) {
+    if (product.discountPercent <= 0) {
       return const SizedBox.shrink();
     }
 
@@ -33,24 +33,12 @@ class ProductOfferSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
-        if (product.discountPercent > 0)
-          _OfferTile(
-            icon: Icons.local_offer_rounded,
-            title: '${product.discountPercent}% product discount',
-            subtitle:
-                'You save ₹${product.savings.toStringAsFixed(2)} on this unit.',
-          ),
-        if (product.discountPercent > 0 && couponCode.trim().isNotEmpty)
-          const SizedBox(height: 9),
-        if (couponCode.trim().isNotEmpty)
-          _OfferTile(
-            icon: Icons.confirmation_number_rounded,
-            title: 'Use code ${couponCode.trim().toUpperCase()}',
-            subtitle:
-                couponText.trim().isEmpty
-                    ? 'Apply this coupon during checkout.'
-                    : couponText.trim(),
-          ),
+        _OfferTile(
+          icon: Icons.local_offer_rounded,
+          title: '${product.discountPercent}% product discount',
+          subtitle:
+              'You save ₹${product.savings.toStringAsFixed(2)} on this unit.',
+        ),
       ],
     );
   }

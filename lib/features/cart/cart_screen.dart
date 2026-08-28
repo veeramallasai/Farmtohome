@@ -34,6 +34,31 @@ class _CartScreenState extends State<CartScreen> {
     super.dispose();
   }
 
+  Future<void> _clearCart() async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (BuildContext context) => AlertDialog(
+            title: const Text('Clear cart?'),
+            content: const Text('All products will be removed from your cart.'),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('CANCEL'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('CLEAR'),
+              ),
+            ],
+          ),
+    );
+    if (confirmed != true) return;
+    final bool success = await _provider.clearCart();
+    if (!success)
+      _showMessage(_provider.errorMessage ?? 'Unable to clear cart.');
+  }
+
   void _openDelivery(CartModel cart) {
     Navigator.pushNamed(
       context,

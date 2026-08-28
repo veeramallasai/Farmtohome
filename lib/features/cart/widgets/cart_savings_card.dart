@@ -6,7 +6,7 @@ class CartSavingsCard extends StatelessWidget {
   const CartSavingsCard({
     super.key,
     required this.productSavings,
-    required this.couponSavings,
+    this.couponSavings = 0,
   });
 
   final double productSavings;
