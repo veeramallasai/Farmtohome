@@ -1,5 +1,8 @@
+-- V6__platform_modules.sql - Clean, Idempotent Platform Modules Migration
+
+-- 1. categories table
 CREATE TABLE IF NOT EXISTS categories (
-  id uuid PRIMARY KEY,
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name varchar(160) NOT NULL DEFAULT '',
   description varchar(500) NOT NULL DEFAULT '',
   image_url varchar(500) NOT NULL DEFAULT '',
@@ -26,6 +29,7 @@ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
+
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS name varchar(160) NOT NULL DEFAULT '';
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS description varchar(500) NOT NULL DEFAULT '';
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS image_url varchar(500) NOT NULL DEFAULT '';
@@ -35,8 +39,14 @@ ALTER TABLE categories ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT 
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 
+ALTER TABLE categories ALTER COLUMN created_at SET DEFAULT now();
+ALTER TABLE categories ALTER COLUMN updated_at SET DEFAULT now();
+ALTER TABLE categories ALTER COLUMN active SET DEFAULT true;
+ALTER TABLE categories ALTER COLUMN sort_order SET DEFAULT 0;
+
 CREATE INDEX IF NOT EXISTS idx_categories_active_sort ON categories(active, sort_order);
 
+-- 2. banners table
 CREATE TABLE IF NOT EXISTS banners (
   id varchar(100) PRIMARY KEY,
   title varchar(200) NOT NULL DEFAULT '',
@@ -51,6 +61,7 @@ CREATE TABLE IF NOT EXISTS banners (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
 ALTER TABLE banners ADD COLUMN IF NOT EXISTS title varchar(200) NOT NULL DEFAULT '';
 ALTER TABLE banners ADD COLUMN IF NOT EXISTS subtitle varchar(500) NOT NULL DEFAULT '';
 ALTER TABLE banners ADD COLUMN IF NOT EXISTS image_url varchar(500) NOT NULL DEFAULT '';
@@ -61,8 +72,13 @@ ALTER TABLE banners ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT tru
 ALTER TABLE banners ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
 ALTER TABLE banners ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 
+ALTER TABLE banners ALTER COLUMN created_at SET DEFAULT now();
+ALTER TABLE banners ALTER COLUMN updated_at SET DEFAULT now();
+ALTER TABLE banners ALTER COLUMN active SET DEFAULT true;
+
 CREATE INDEX IF NOT EXISTS idx_banners_visible ON banners(active, priority);
 
+-- 3. offers table
 CREATE TABLE IF NOT EXISTS offers (
   id varchar(100) PRIMARY KEY,
   title varchar(200) NOT NULL DEFAULT '',
@@ -79,6 +95,7 @@ CREATE TABLE IF NOT EXISTS offers (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
 ALTER TABLE offers ADD COLUMN IF NOT EXISTS title varchar(200) NOT NULL DEFAULT '';
 ALTER TABLE offers ADD COLUMN IF NOT EXISTS description varchar(500) NOT NULL DEFAULT '';
 ALTER TABLE offers ADD COLUMN IF NOT EXISTS discount_type varchar(30) NOT NULL DEFAULT 'percentage';
@@ -90,8 +107,13 @@ ALTER TABLE offers ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true
 ALTER TABLE offers ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
 ALTER TABLE offers ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 
+ALTER TABLE offers ALTER COLUMN created_at SET DEFAULT now();
+ALTER TABLE offers ALTER COLUMN updated_at SET DEFAULT now();
+ALTER TABLE offers ALTER COLUMN active SET DEFAULT true;
+
 CREATE INDEX IF NOT EXISTS idx_offers_active ON offers(active, starts_at, ends_at);
 
+-- 4. farmers table
 CREATE TABLE IF NOT EXISTS farmers (
   id varchar(120) PRIMARY KEY,
   name varchar(180) NOT NULL DEFAULT '',
@@ -107,6 +129,7 @@ CREATE TABLE IF NOT EXISTS farmers (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
 ALTER TABLE farmers ADD COLUMN IF NOT EXISTS name varchar(180) NOT NULL DEFAULT '';
 ALTER TABLE farmers ADD COLUMN IF NOT EXISTS farm_name varchar(220) NOT NULL DEFAULT '';
 ALTER TABLE farmers ADD COLUMN IF NOT EXISTS location varchar(250) NOT NULL DEFAULT '';
@@ -120,8 +143,13 @@ ALTER TABLE farmers ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT tru
 ALTER TABLE farmers ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
 ALTER TABLE farmers ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 
+ALTER TABLE farmers ALTER COLUMN created_at SET DEFAULT now();
+ALTER TABLE farmers ALTER COLUMN updated_at SET DEFAULT now();
+ALTER TABLE farmers ALTER COLUMN active SET DEFAULT true;
+
 CREATE INDEX IF NOT EXISTS idx_farmers_active_rating ON farmers(active, verified DESC, rating DESC);
 
+-- 5. delivery_slots table
 CREATE TABLE IF NOT EXISTS delivery_slots (
   id varchar(120) PRIMARY KEY,
   method varchar(40) NOT NULL DEFAULT 'standard',
@@ -136,6 +164,7 @@ CREATE TABLE IF NOT EXISTS delivery_slots (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
 ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS method varchar(40) NOT NULL DEFAULT 'standard';
 ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS label varchar(160) NOT NULL DEFAULT '';
 ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS start_time time NOT NULL DEFAULT '08:00:00';
@@ -148,8 +177,13 @@ ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS slot_date date;
 ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
 ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 
+ALTER TABLE delivery_slots ALTER COLUMN created_at SET DEFAULT now();
+ALTER TABLE delivery_slots ALTER COLUMN updated_at SET DEFAULT now();
+ALTER TABLE delivery_slots ALTER COLUMN available SET DEFAULT true;
+
 CREATE INDEX IF NOT EXISTS idx_delivery_slots_lookup ON delivery_slots(method, slot_date, available, start_time);
 
+-- 6. Foreign key cleanup and product_id type alignment
 DO $$
 BEGIN
   BEGIN
@@ -200,6 +234,7 @@ BEGIN
   END IF;
 END $$;
 
+-- 7. Legacy user_id / user_uid column renaming to owner_uid
 DO $$
 DECLARE
   tbl text;
@@ -228,6 +263,7 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
+-- 8. favorites table
 CREATE TABLE IF NOT EXISTS favorites (
   id bigserial PRIMARY KEY,
   owner_uid varchar(160) NOT NULL DEFAULT '',
@@ -240,8 +276,9 @@ ALTER TABLE favorites ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL D
 
 CREATE INDEX IF NOT EXISTS idx_favorites_owner ON favorites(owner_uid, created_at DESC);
 
+-- 9. reviews table
 CREATE TABLE IF NOT EXISTS reviews (
-  id uuid PRIMARY KEY,
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   product_id varchar(120) NOT NULL DEFAULT '',
   owner_uid varchar(160) NOT NULL DEFAULT '',
   user_name varchar(180) NOT NULL DEFAULT 'Verified customer',
@@ -264,8 +301,9 @@ ALTER TABLE reviews ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEF
 
 CREATE INDEX IF NOT EXISTS idx_reviews_product_created ON reviews(product_id, created_at DESC);
 
+-- 10. notifications table
 CREATE TABLE IF NOT EXISTS notifications (
-  id uuid PRIMARY KEY,
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_uid varchar(160) NOT NULL DEFAULT '',
   title varchar(220) NOT NULL DEFAULT '',
   body varchar(1000) NOT NULL DEFAULT '',
@@ -289,8 +327,9 @@ ALTER TABLE notifications ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NU
 CREATE INDEX IF NOT EXISTS idx_notifications_owner_created ON notifications(owner_uid, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(owner_uid, is_read) WHERE NOT is_read;
 
+-- 11. support_tickets table
 CREATE TABLE IF NOT EXISTS support_tickets (
-  id uuid PRIMARY KEY,
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_uid varchar(160) NOT NULL DEFAULT '',
   subject varchar(220) NOT NULL DEFAULT '',
   message varchar(2500) NOT NULL DEFAULT '',
@@ -313,6 +352,7 @@ ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT 
 
 CREATE INDEX IF NOT EXISTS idx_support_owner_updated ON support_tickets(owner_uid, updated_at DESC);
 
+-- 12. device_tokens table
 CREATE TABLE IF NOT EXISTS device_tokens (
   id bigserial PRIMARY KEY,
   owner_uid varchar(160) NOT NULL DEFAULT '',
@@ -333,8 +373,9 @@ ALTER TABLE device_tokens ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NU
 
 CREATE INDEX IF NOT EXISTS idx_device_tokens_owner ON device_tokens(owner_uid, active);
 
+-- 13. payment_events table
 CREATE TABLE IF NOT EXISTS payment_events (
-  id uuid PRIMARY KEY,
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   payment_id uuid,
   owner_uid varchar(160) NOT NULL DEFAULT '',
   gateway varchar(80) NOT NULL DEFAULT '',
@@ -357,13 +398,29 @@ ALTER TABLE payment_events ADD COLUMN IF NOT EXISTS created_at timestamptz NOT N
 
 CREATE INDEX IF NOT EXISTS idx_payment_events_payment ON payment_events(payment_id, created_at DESC);
 
-INSERT INTO categories (id, name, description, image_url, icon_name, sort_order, active, created_at, updated_at)
-VALUES
-  (gen_random_uuid(), 'Vegetables', 'Farm-fresh vegetables selected every day', 'assets/images/categories/vegetables.png', 'eco', 0, true, now(), now()),
-  (gen_random_uuid(), 'Fruits', 'Naturally fresh seasonal and everyday fruits', 'assets/images/categories/fruits.png', 'nutrition', 1, true, now(), now()),
-  (gen_random_uuid(), 'Dairy', 'Fresh milk and trusted dairy essentials', 'assets/images/categories/dairy.png', 'local_drink', 2, true, now(), now()),
-  (gen_random_uuid(), 'Seasonal', 'Limited seasonal harvests picked for you', 'assets/images/categories/seasonal.png', 'calendar_month', 3, true, now(), now())
-ON CONFLICT DO NOTHING;
+-- 14. Seed Data (Idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Vegetables') THEN
+    INSERT INTO categories (id, name, description, image_url, icon_name, sort_order, active, created_at, updated_at)
+    VALUES (gen_random_uuid(), 'Vegetables', 'Farm-fresh vegetables selected every day', 'assets/images/categories/vegetables.png', 'eco', 0, true, now(), now());
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Fruits') THEN
+    INSERT INTO categories (id, name, description, image_url, icon_name, sort_order, active, created_at, updated_at)
+    VALUES (gen_random_uuid(), 'Fruits', 'Naturally fresh seasonal and everyday fruits', 'assets/images/categories/fruits.png', 'nutrition', 1, true, now(), now());
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Dairy') THEN
+    INSERT INTO categories (id, name, description, image_url, icon_name, sort_order, active, created_at, updated_at)
+    VALUES (gen_random_uuid(), 'Dairy', 'Fresh milk and trusted dairy essentials', 'assets/images/categories/dairy.png', 'local_drink', 2, true, now(), now());
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Seasonal') THEN
+    INSERT INTO categories (id, name, description, image_url, icon_name, sort_order, active, created_at, updated_at)
+    VALUES (gen_random_uuid(), 'Seasonal', 'Limited seasonal harvests picked for you', 'assets/images/categories/seasonal.png', 'calendar_month', 3, true, now(), now());
+  END IF;
+END $$;
 
 INSERT INTO banners (id, title, subtitle, image_url, action_label, route, priority, active, created_at, updated_at)
 VALUES
