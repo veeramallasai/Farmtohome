@@ -381,6 +381,11 @@ class _OtpScreenState extends State<OtpScreen>
 
       if (!mounted) return;
 
+      final String? returnedOtp = (result['otp'] ?? result['otpCode'])?.toString();
+      if (returnedOtp != null && returnedOtp.trim().isNotEmpty) {
+        _otpController.text = returnedOtp.trim();
+      }
+
       final bool alreadyVerified = result['alreadyVerified'] == true;
 
       if (alreadyVerified) {
