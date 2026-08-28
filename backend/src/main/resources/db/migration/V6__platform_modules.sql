@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS categories (
   id varchar(80) PRIMARY KEY,
-  name varchar(160) NOT NULL,
+  name varchar(160) NOT NULL DEFAULT '',
   description varchar(500) NOT NULL DEFAULT '',
   image_url varchar(500) NOT NULL DEFAULT '',
   icon_name varchar(100) NOT NULL DEFAULT '',
@@ -9,11 +9,20 @@ CREATE TABLE IF NOT EXISTS categories (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS name varchar(160) NOT NULL DEFAULT '';
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS description varchar(500) NOT NULL DEFAULT '';
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS image_url varchar(500) NOT NULL DEFAULT '';
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS icon_name varchar(100) NOT NULL DEFAULT '';
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS sort_order integer NOT NULL DEFAULT 0;
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true;
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
 CREATE INDEX IF NOT EXISTS idx_categories_active_sort ON categories(active, sort_order);
 
 CREATE TABLE IF NOT EXISTS banners (
   id varchar(100) PRIMARY KEY,
-  title varchar(200) NOT NULL,
+  title varchar(200) NOT NULL DEFAULT '',
   subtitle varchar(500) NOT NULL DEFAULT '',
   image_url varchar(500) NOT NULL DEFAULT '',
   action_label varchar(100) NOT NULL DEFAULT '',
@@ -23,65 +32,105 @@ CREATE TABLE IF NOT EXISTS banners (
   starts_at timestamptz,
   ends_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT chk_banner_dates CHECK (ends_at IS NULL OR starts_at IS NULL OR ends_at >= starts_at)
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE banners ADD COLUMN IF NOT EXISTS title varchar(200) NOT NULL DEFAULT '';
+ALTER TABLE banners ADD COLUMN IF NOT EXISTS subtitle varchar(500) NOT NULL DEFAULT '';
+ALTER TABLE banners ADD COLUMN IF NOT EXISTS image_url varchar(500) NOT NULL DEFAULT '';
+ALTER TABLE banners ADD COLUMN IF NOT EXISTS action_label varchar(100) NOT NULL DEFAULT '';
+ALTER TABLE banners ADD COLUMN IF NOT EXISTS route varchar(300) NOT NULL DEFAULT '';
+ALTER TABLE banners ADD COLUMN IF NOT EXISTS priority integer NOT NULL DEFAULT 0;
+ALTER TABLE banners ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true;
+ALTER TABLE banners ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE banners ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
 CREATE INDEX IF NOT EXISTS idx_banners_visible ON banners(active, priority);
 
 CREATE TABLE IF NOT EXISTS offers (
   id varchar(100) PRIMARY KEY,
-  title varchar(200) NOT NULL,
+  title varchar(200) NOT NULL DEFAULT '',
   description varchar(500) NOT NULL DEFAULT '',
   code varchar(80) NOT NULL UNIQUE,
-  discount_type varchar(30) NOT NULL,
-  discount_value numeric(12,2) NOT NULL CHECK (discount_value >= 0),
-  minimum_order numeric(12,2) NOT NULL DEFAULT 0 CHECK (minimum_order >= 0),
-  maximum_discount numeric(12,2) NOT NULL DEFAULT 0 CHECK (maximum_discount >= 0),
+  discount_type varchar(30) NOT NULL DEFAULT 'percentage',
+  discount_value numeric(12,2) NOT NULL DEFAULT 0,
+  minimum_order numeric(12,2) NOT NULL DEFAULT 0,
+  maximum_discount numeric(12,2) NOT NULL DEFAULT 0,
   image_url varchar(500) NOT NULL DEFAULT '',
   active boolean NOT NULL DEFAULT true,
   starts_at timestamptz,
   ends_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT chk_offer_type CHECK (discount_type IN ('percentage', 'fixed')),
-  CONSTRAINT chk_offer_dates CHECK (ends_at IS NULL OR starts_at IS NULL OR ends_at >= starts_at)
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE offers ADD COLUMN IF NOT EXISTS title varchar(200) NOT NULL DEFAULT '';
+ALTER TABLE offers ADD COLUMN IF NOT EXISTS description varchar(500) NOT NULL DEFAULT '';
+ALTER TABLE offers ADD COLUMN IF NOT EXISTS discount_type varchar(30) NOT NULL DEFAULT 'percentage';
+ALTER TABLE offers ADD COLUMN IF NOT EXISTS discount_value numeric(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE offers ADD COLUMN IF NOT EXISTS minimum_order numeric(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE offers ADD COLUMN IF NOT EXISTS maximum_discount numeric(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE offers ADD COLUMN IF NOT EXISTS image_url varchar(500) NOT NULL DEFAULT '';
+ALTER TABLE offers ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true;
+ALTER TABLE offers ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE offers ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
 CREATE INDEX IF NOT EXISTS idx_offers_active ON offers(active, starts_at, ends_at);
 
 CREATE TABLE IF NOT EXISTS farmers (
   id varchar(120) PRIMARY KEY,
-  name varchar(180) NOT NULL,
-  farm_name varchar(220) NOT NULL,
+  name varchar(180) NOT NULL DEFAULT '',
+  farm_name varchar(220) NOT NULL DEFAULT '',
   location varchar(250) NOT NULL DEFAULT '',
   image_url varchar(500) NOT NULL DEFAULT '',
-  rating numeric(3,2) NOT NULL DEFAULT 0 CHECK (rating BETWEEN 0 AND 5),
-  review_count integer NOT NULL DEFAULT 0 CHECK (review_count >= 0),
+  rating numeric(3,2) NOT NULL DEFAULT 0,
+  review_count integer NOT NULL DEFAULT 0,
   verified boolean NOT NULL DEFAULT false,
-  experience_years integer NOT NULL DEFAULT 0 CHECK (experience_years >= 0),
+  experience_years integer NOT NULL DEFAULT 0,
   speciality varchar(250) NOT NULL DEFAULT '',
   active boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE farmers ADD COLUMN IF NOT EXISTS name varchar(180) NOT NULL DEFAULT '';
+ALTER TABLE farmers ADD COLUMN IF NOT EXISTS farm_name varchar(220) NOT NULL DEFAULT '';
+ALTER TABLE farmers ADD COLUMN IF NOT EXISTS location varchar(250) NOT NULL DEFAULT '';
+ALTER TABLE farmers ADD COLUMN IF NOT EXISTS image_url varchar(500) NOT NULL DEFAULT '';
+ALTER TABLE farmers ADD COLUMN IF NOT EXISTS rating numeric(3,2) NOT NULL DEFAULT 0;
+ALTER TABLE farmers ADD COLUMN IF NOT EXISTS review_count integer NOT NULL DEFAULT 0;
+ALTER TABLE farmers ADD COLUMN IF NOT EXISTS verified boolean NOT NULL DEFAULT false;
+ALTER TABLE farmers ADD COLUMN IF NOT EXISTS experience_years integer NOT NULL DEFAULT 0;
+ALTER TABLE farmers ADD COLUMN IF NOT EXISTS speciality varchar(250) NOT NULL DEFAULT '';
+ALTER TABLE farmers ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true;
+ALTER TABLE farmers ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE farmers ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
 CREATE INDEX IF NOT EXISTS idx_farmers_active_rating ON farmers(active, verified DESC, rating DESC);
 
 CREATE TABLE IF NOT EXISTS delivery_slots (
   id varchar(120) PRIMARY KEY,
-  method varchar(40) NOT NULL,
-  label varchar(160) NOT NULL,
-  start_time time NOT NULL,
-  end_time time NOT NULL,
-  fee numeric(12,2) NOT NULL DEFAULT 0 CHECK (fee >= 0),
+  method varchar(40) NOT NULL DEFAULT 'standard',
+  label varchar(160) NOT NULL DEFAULT '',
+  start_time time NOT NULL DEFAULT '08:00:00',
+  end_time time NOT NULL DEFAULT '20:00:00',
+  fee numeric(12,2) NOT NULL DEFAULT 0,
   available boolean NOT NULL DEFAULT true,
-  capacity integer NOT NULL DEFAULT 0 CHECK (capacity >= 0),
-  booked_count integer NOT NULL DEFAULT 0 CHECK (booked_count >= 0),
+  capacity integer NOT NULL DEFAULT 0,
+  booked_count integer NOT NULL DEFAULT 0,
   slot_date date,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT chk_delivery_method CHECK (method IN ('standard', 'express', 'scheduled', 'pickup')),
-  CONSTRAINT chk_delivery_times CHECK (end_time > start_time),
-  CONSTRAINT chk_delivery_capacity CHECK (capacity = 0 OR booked_count <= capacity)
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS method varchar(40) NOT NULL DEFAULT 'standard';
+ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS label varchar(160) NOT NULL DEFAULT '';
+ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS start_time time NOT NULL DEFAULT '08:00:00';
+ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS end_time time NOT NULL DEFAULT '20:00:00';
+ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS fee numeric(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS available boolean NOT NULL DEFAULT true;
+ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS capacity integer NOT NULL DEFAULT 0;
+ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS booked_count integer NOT NULL DEFAULT 0;
+ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS slot_date date;
+ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
 CREATE INDEX IF NOT EXISTS idx_delivery_slots_lookup ON delivery_slots(method, slot_date, available, start_time);
 
 DO $$
