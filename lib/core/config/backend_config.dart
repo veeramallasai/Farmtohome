@@ -18,8 +18,8 @@ class BackendConfig {
     defaultValue: '',
   );
 
-  static const String _railwayUrl = String.fromEnvironment(
-    'RAILWAY_URL',
+  static const String _backendUrl = String.fromEnvironment(
+    'BACKEND_URL',
     defaultValue: '',
   );
 
@@ -36,8 +36,8 @@ class BackendConfig {
       url = _underscoreApiBaseUrl.trim();
     } else if (_apiUrl.trim().isNotEmpty) {
       url = _apiUrl.trim();
-    } else if (_railwayUrl.trim().isNotEmpty) {
-      url = _railwayUrl.trim();
+    } else if (_backendUrl.trim().isNotEmpty) {
+      url = _backendUrl.trim();
     } else if (kDebugMode) {
       if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
         url = 'http://10.0.2.2:8085/api/v1';
