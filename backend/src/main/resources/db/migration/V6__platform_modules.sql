@@ -86,6 +86,26 @@ CREATE INDEX IF NOT EXISTS idx_delivery_slots_lookup ON delivery_slots(method, s
 
 DO $$
 BEGIN
+  BEGIN
+    ALTER TABLE favorites DROP CONSTRAINT IF EXISTS favorites_product_id_fkey;
+  EXCEPTION WHEN OTHERS THEN NULL;
+  END;
+
+  BEGIN
+    ALTER TABLE reviews DROP CONSTRAINT IF EXISTS reviews_product_id_fkey;
+  EXCEPTION WHEN OTHERS THEN NULL;
+  END;
+
+  BEGIN
+    ALTER TABLE cart_items DROP CONSTRAINT IF EXISTS cart_items_product_id_fkey;
+  EXCEPTION WHEN OTHERS THEN NULL;
+  END;
+
+  BEGIN
+    ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_product_id_fkey;
+  EXCEPTION WHEN OTHERS THEN NULL;
+  END;
+
   IF EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_name = 'products'
