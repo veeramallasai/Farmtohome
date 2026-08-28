@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS categories (
-  id varchar(80) PRIMARY KEY,
+  id uuid PRIMARY KEY,
   name varchar(160) NOT NULL DEFAULT '',
   description varchar(500) NOT NULL DEFAULT '',
   image_url varchar(500) NOT NULL DEFAULT '',
@@ -9,6 +9,23 @@ CREATE TABLE IF NOT EXISTS categories (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'categories' AND column_name = 'id'
+      AND data_type NOT IN ('uuid')
+  ) THEN
+    ALTER TABLE categories ALTER COLUMN id TYPE uuid USING (
+      CASE WHEN id ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+           THEN id::uuid
+           ELSE gen_random_uuid()
+      END
+    );
+  END IF;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS name varchar(160) NOT NULL DEFAULT '';
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS description varchar(500) NOT NULL DEFAULT '';
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS image_url varchar(500) NOT NULL DEFAULT '';
@@ -342,10 +359,10 @@ CREATE INDEX IF NOT EXISTS idx_payment_events_payment ON payment_events(payment_
 
 INSERT INTO categories (id, name, description, image_url, icon_name, sort_order)
 VALUES
-  (gen_random_uuid()::text, 'Vegetables', 'Farm-fresh vegetables selected every day', 'assets/images/categories/vegetables.png', 'eco', 0),
-  (gen_random_uuid()::text, 'Fruits', 'Naturally fresh seasonal and everyday fruits', 'assets/images/categories/fruits.png', 'nutrition', 1),
-  (gen_random_uuid()::text, 'Dairy', 'Fresh milk and trusted dairy essentials', 'assets/images/categories/dairy.png', 'local_drink', 2),
-  (gen_random_uuid()::text, 'Seasonal', 'Limited seasonal harvests picked for you', 'assets/images/categories/seasonal.png', 'calendar_month', 3)
+  (gen_random_uuid(), 'Vegetables', 'Farm-fresh vegetables selected every day', 'assets/images/categories/vegetables.png', 'eco', 0),
+  (gen_random_uuid(), 'Fruits', 'Naturally fresh seasonal and everyday fruits', 'assets/images/categories/fruits.png', 'nutrition', 1),
+  (gen_random_uuid(), 'Dairy', 'Fresh milk and trusted dairy essentials', 'assets/images/categories/dairy.png', 'local_drink', 2),
+  (gen_random_uuid(), 'Seasonal', 'Limited seasonal harvests picked for you', 'assets/images/categories/seasonal.png', 'calendar_month', 3)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO banners (id, title, subtitle, image_url, action_label, route, priority)
