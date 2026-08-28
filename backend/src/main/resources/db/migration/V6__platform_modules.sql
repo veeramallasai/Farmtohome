@@ -337,10 +337,7 @@ ALTER TABLE payment_events ADD COLUMN IF NOT EXISTS signature_verified boolean N
 ALTER TABLE payment_events ADD COLUMN IF NOT EXISTS payload_json text NOT NULL DEFAULT '{}';
 ALTER TABLE payment_events ADD COLUMN IF NOT EXISTS processed_at timestamptz;
 ALTER TABLE payment_events ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
-  payload_json text NOT NULL,
-  processed_at timestamptz,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
+
 CREATE INDEX IF NOT EXISTS idx_payment_events_payment ON payment_events(payment_id, created_at DESC);
 
 INSERT INTO categories (id, name, description, image_url, icon_name, sort_order)
