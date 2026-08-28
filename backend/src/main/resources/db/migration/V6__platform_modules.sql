@@ -1,38 +1,6 @@
--- V6__platform_modules.sql - Streamlined Essential Platform Modules Migration
+-- V6__platform_modules.sql - Minimal Core Platform Modules DDL (No Seed Data)
 
--- 1. Pre-migration legacy column reconciliation & safeguards
-DO $$
-DECLARE
-  tbl text;
-  col text;
-BEGIN
-  FOR tbl IN VALUES ('categories', 'banners', 'offers', 'farmers', 'delivery_slots', 'favorites', 'reviews', 'notifications', 'support_tickets', 'device_tokens', 'payment_events') LOOP
-    -- Drop NOT NULL on legacy status columns if pre-existing
-    FOR col IN VALUES ('is_active', 'active', 'is_available', 'available', 'is_deleted', 'deleted', 'is_read', 'verified', 'verified_purchase', 'signature_verified') LOOP
-      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = tbl AND column_name = col) THEN
-        BEGIN
-          EXECUTE format('ALTER TABLE %I ALTER COLUMN %I DROP NOT NULL', tbl, col);
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
-      END IF;
-    END LOOP;
-
-    -- Reconcile legacy is_active vs active
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = tbl AND column_name = 'is_active') THEN
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = tbl AND column_name = 'active') THEN
-          EXECUTE format('ALTER TABLE %I RENAME COLUMN is_active TO active', tbl);
-        ELSE
-          EXECUTE format('ALTER TABLE %I ALTER COLUMN is_active SET DEFAULT true', tbl);
-          EXECUTE format('UPDATE %I SET is_active = active WHERE is_active IS NULL', tbl);
-        END IF;
-      EXCEPTION WHEN OTHERS THEN NULL;
-      END;
-    END IF;
-  END LOOP;
-END $$;
-
--- 2. Essential Platform Tables Creation
+-- 1. categories table
 CREATE TABLE IF NOT EXISTS categories (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name varchar(160) NOT NULL DEFAULT '',
@@ -47,6 +15,7 @@ CREATE TABLE IF NOT EXISTS categories (
 );
 CREATE INDEX IF NOT EXISTS idx_categories_active_sort ON categories(active, sort_order);
 
+-- 2. banners table
 DROP TABLE IF EXISTS banners CASCADE;
 CREATE TABLE banners (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -65,6 +34,7 @@ CREATE TABLE banners (
 );
 CREATE INDEX idx_banners_visible ON banners(active, priority);
 
+-- 3. offers table
 DROP TABLE IF EXISTS offers CASCADE;
 CREATE TABLE offers (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -85,6 +55,7 @@ CREATE TABLE offers (
 );
 CREATE INDEX idx_offers_active ON offers(active, starts_at, ends_at);
 
+-- 4. farmers table
 DROP TABLE IF EXISTS farmers CASCADE;
 CREATE TABLE farmers (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -104,6 +75,7 @@ CREATE TABLE farmers (
 );
 CREATE INDEX idx_farmers_active_rating ON farmers(active, verified DESC, rating DESC);
 
+-- 5. delivery_slots table
 DROP TABLE IF EXISTS delivery_slots CASCADE;
 CREATE TABLE delivery_slots (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -121,6 +93,7 @@ CREATE TABLE delivery_slots (
 );
 CREATE INDEX idx_delivery_slots_lookup ON delivery_slots(method, slot_date, available, start_time);
 
+-- 6. favorites table
 CREATE TABLE IF NOT EXISTS favorites (
   id bigserial PRIMARY KEY,
   owner_uid varchar(160) NOT NULL DEFAULT '',
@@ -129,6 +102,7 @@ CREATE TABLE IF NOT EXISTS favorites (
 );
 CREATE INDEX IF NOT EXISTS idx_favorites_owner ON favorites(owner_uid, created_at DESC);
 
+-- 7. reviews table
 CREATE TABLE IF NOT EXISTS reviews (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   product_id varchar(120) NOT NULL DEFAULT '',
@@ -143,6 +117,7 @@ CREATE TABLE IF NOT EXISTS reviews (
 );
 CREATE INDEX IF NOT EXISTS idx_reviews_product_created ON reviews(product_id, created_at DESC);
 
+-- 8. notifications table
 CREATE TABLE IF NOT EXISTS notifications (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_uid varchar(160) NOT NULL DEFAULT '',
@@ -157,6 +132,7 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 CREATE INDEX IF NOT EXISTS idx_notifications_owner_created ON notifications(owner_uid, created_at DESC);
 
+-- 9. support_tickets table
 CREATE TABLE IF NOT EXISTS support_tickets (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_uid varchar(160) NOT NULL DEFAULT '',
@@ -171,6 +147,7 @@ CREATE TABLE IF NOT EXISTS support_tickets (
 );
 CREATE INDEX IF NOT EXISTS idx_support_owner_updated ON support_tickets(owner_uid, updated_at DESC);
 
+-- 10. device_tokens table
 CREATE TABLE IF NOT EXISTS device_tokens (
   id bigserial PRIMARY KEY,
   owner_uid varchar(160) NOT NULL DEFAULT '',
@@ -183,6 +160,7 @@ CREATE TABLE IF NOT EXISTS device_tokens (
 );
 CREATE INDEX IF NOT EXISTS idx_device_tokens_owner ON device_tokens(owner_uid, active);
 
+-- 11. payment_events table
 CREATE TABLE IF NOT EXISTS payment_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   payment_id uuid,
@@ -197,7 +175,7 @@ CREATE TABLE IF NOT EXISTS payment_events (
 );
 CREATE INDEX IF NOT EXISTS idx_payment_events_payment ON payment_events(payment_id, created_at DESC);
 
--- 3. Product & User ID Alignments
+-- 12. Dynamic foreign key cleanup and product_id alignment
 DO $$
 DECLARE
   rec RECORD;
@@ -224,54 +202,5 @@ BEGIN
       AND data_type NOT IN ('character varying', 'text', 'varchar')
   ) THEN
     ALTER TABLE products ALTER COLUMN id TYPE varchar(120) USING id::text;
-  END IF;
-END $$;
-
--- 4. Essential Idempotent Seed Data
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Vegetables') THEN
-    INSERT INTO categories (id, name, description, image_url, icon_name, sort_order, active, deleted, created_at, updated_at)
-    VALUES (gen_random_uuid(), 'Vegetables', 'Farm-fresh vegetables selected every day', 'assets/images/categories/vegetables.png', 'eco', 0, true, false, now(), now());
-  END IF;
-
-  IF NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Fruits') THEN
-    INSERT INTO categories (id, name, description, image_url, icon_name, sort_order, active, deleted, created_at, updated_at)
-    VALUES (gen_random_uuid(), 'Fruits', 'Naturally fresh seasonal and everyday fruits', 'assets/images/categories/fruits.png', 'nutrition', 1, true, false, now(), now());
-  END IF;
-
-  IF NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Dairy') THEN
-    INSERT INTO categories (id, name, description, image_url, icon_name, sort_order, active, deleted, created_at, updated_at)
-    VALUES (gen_random_uuid(), 'Dairy', 'Fresh milk and trusted dairy essentials', 'assets/images/categories/dairy.png', 'local_drink', 2, true, false, now(), now());
-  END IF;
-
-  IF NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Seasonal') THEN
-    INSERT INTO categories (id, name, description, image_url, icon_name, sort_order, active, deleted, created_at, updated_at)
-    VALUES (gen_random_uuid(), 'Seasonal', 'Limited seasonal harvests picked for you', 'assets/images/categories/seasonal.png', 'calendar_month', 3, true, false, now(), now());
-  END IF;
-
-  IF NOT EXISTS (SELECT 1 FROM banners WHERE title = 'Fresh from local farms') THEN
-    INSERT INTO banners (id, title, subtitle, image_url, action_label, route, priority, active, deleted, created_at, updated_at)
-    VALUES (gen_random_uuid(), 'Fresh from local farms', 'Handpicked vegetables delivered with care', 'assets/images/categories/vegetables.png', 'Shop now', '/category-products?category=vegetables', 0, true, false, now(), now());
-  END IF;
-
-  IF NOT EXISTS (SELECT 1 FROM banners WHERE title = 'Seasonal favourites') THEN
-    INSERT INTO banners (id, title, subtitle, image_url, action_label, route, priority, active, deleted, created_at, updated_at)
-    VALUES (gen_random_uuid(), 'Seasonal favourites', 'Naturally fresh fruits at honest prices', 'assets/images/categories/seasonal.png', 'Explore', '/category-products?category=seasonal', 1, true, false, now(), now());
-  END IF;
-
-  IF NOT EXISTS (SELECT 1 FROM offers WHERE code = 'FRESH10') THEN
-    INSERT INTO offers (id, title, description, code, discount_type, discount_value, minimum_order, maximum_discount, active, deleted, created_at, updated_at)
-    VALUES (gen_random_uuid(), 'Fresh 10% Off', 'Save on your first farm-fresh basket', 'FRESH10', 'percentage', 10, 299, 100, true, false, now(), now());
-  END IF;
-
-  IF NOT EXISTS (SELECT 1 FROM farmers WHERE farm_name = 'Green Valley Farms') THEN
-    INSERT INTO farmers (id, name, farm_name, location, rating, review_count, verified, experience_years, speciality, active, deleted, created_at, updated_at)
-    VALUES (gen_random_uuid(), 'Ravi Kumar', 'Green Valley Farms', 'Guntur, Andhra Pradesh', 4.8, 126, true, 14, 'Leafy vegetables', true, false, now(), now());
-  END IF;
-
-  IF NOT EXISTS (SELECT 1 FROM delivery_slots WHERE label = 'Morning delivery') THEN
-    INSERT INTO delivery_slots (id, method, label, start_time, end_time, fee, capacity, booked_count, available, created_at, updated_at)
-    VALUES (gen_random_uuid(), 'standard', 'Morning delivery', '08:00', '12:00', 35, 100, 0, true, now(), now());
   END IF;
 END $$;
