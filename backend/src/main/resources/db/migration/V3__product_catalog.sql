@@ -118,17 +118,31 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS review_count integer NOT NULL DEFA
 ALTER TABLE products ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
 ALTER TABLE products ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 
--- Explicit handling for category_id (legacy UUID column) to ensure it is optional and never assigned empty string
+-- Automatically drop NOT NULL constraints and defaults from any legacy columns (like available_status, category_id) that are not part of the active entity schema
 DO $$
+DECLARE
+  col RECORD;
 BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'products' AND column_name = 'category_id'
-  ) THEN
-    ALTER TABLE products ALTER COLUMN category_id DROP NOT NULL;
-    ALTER TABLE products ALTER COLUMN category_id DROP DEFAULT;
-  END IF;
-EXCEPTION WHEN OTHERS THEN NULL;
+  FOR col IN
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_name = 'products'
+      AND table_schema = current_schema()
+      AND is_nullable = 'NO'
+      AND column_name NOT IN (
+        'id', 'name', 'english_name', 'telugu_name', 'description', 
+        'category', 'image_url', 'unit', 'price', 'mrp', 
+        'shop_unit', 'shop_price', 'shop_mrp', 'stock_quantity', 
+        'active', 'fresh', 'available', 'deleted', 'rating', 'review_count',
+        'created_at', 'updated_at'
+      )
+  LOOP
+    BEGIN
+      EXECUTE format('ALTER TABLE products ALTER COLUMN %I DROP NOT NULL', col.column_name);
+      EXECUTE format('ALTER TABLE products ALTER COLUMN %I DROP DEFAULT', col.column_name);
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+  END LOOP;
 END $$;
 
 UPDATE products SET available = true WHERE available IS NULL;
