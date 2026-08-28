@@ -444,7 +444,7 @@ public class EmailOtpService {
 
     try {
       SimpleMailMessage message = new SimpleMailMessage();
-      message.setFrom(mailFrom);
+      message.setFrom((mailFrom != null && !mailFrom.isBlank()) ? mailFrom : "veeramallasaipichaiah456@gmail.com");
       message.setTo(to);
       message.setSubject("Farm To Home - Email Verification OTP");
       message.setText(
@@ -454,8 +454,11 @@ public class EmailOtpService {
       mailSender.send(message);
       System.out.println("[EMAIL-OTP-SUCCESS] SMTP Email dispatched successfully to " + to);
     } catch (Exception error) {
-      System.err.println("[EMAIL-OTP-WARN] Could not send SMTP email to " + to + ": " + error.getMessage());
+      System.err.println("[EMAIL-OTP-FAILED] Could not send SMTP email to " + to + ": " + error.getMessage());
       error.printStackTrace();
+      throw new ApiException(
+          HttpStatus.INTERNAL_SERVER_ERROR,
+          "Failed to deliver OTP email: " + error.getMessage());
     }
   }
 
