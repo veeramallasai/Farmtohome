@@ -18,7 +18,7 @@ class MigrationCoverageTest {
         resource("/db/migration/V7__notification_preferences.sql"));
 
     for (String table : new String[] {
-        "products", "coupons", "carts", "cart_items", "orders",
+        "products", "carts", "cart_items", "orders",
         "order_items", "payments", "app_users", "addresses", "categories",
         "banners", "offers", "farmers", "delivery_slots", "favorites",
         "reviews", "notifications", "notification_preferences",

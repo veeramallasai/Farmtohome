@@ -34,10 +34,6 @@ public class OrderEntity {
   private BigDecimal mrpTotal;
   @Column(nullable = false, precision = 12, scale = 2)
   private BigDecimal productSavings;
-  @Column(nullable = false)
-  private String couponCode;
-  @Column(nullable = false, precision = 12, scale = 2)
-  private BigDecimal couponDiscount;
   @Column(nullable = false, precision = 12, scale = 2)
   private BigDecimal deliveryFee;
   @Column(nullable = false, precision = 12, scale = 2)
@@ -65,8 +61,8 @@ public class OrderEntity {
   public OrderEntity(
       UUID id, String orderNumber, String ownerUid, String shoppingMode,
       UUID paymentId, BigDecimal subtotal, BigDecimal mrpTotal,
-      BigDecimal couponDiscount, BigDecimal deliveryFee, BigDecimal totalAmount,
-      int itemCount, String couponCode, String addressId, String addressJson,
+      BigDecimal deliveryFee, BigDecimal totalAmount,
+      int itemCount, String addressId, String addressJson,
       String deliveryMethod, LocalDate deliveryDate, String deliverySlot) {
     this.id = id;
     this.orderNumber = orderNumber;
@@ -79,8 +75,6 @@ public class OrderEntity {
     this.subtotal = subtotal;
     this.mrpTotal = mrpTotal;
     this.productSavings = mrpTotal.subtract(subtotal).max(BigDecimal.ZERO);
-    this.couponCode = couponCode;
-    this.couponDiscount = couponDiscount;
     this.deliveryFee = deliveryFee;
     this.totalAmount = totalAmount;
     this.itemCount = itemCount;
@@ -105,8 +99,6 @@ public class OrderEntity {
   public BigDecimal getSubtotal() { return subtotal; }
   public BigDecimal getMrpTotal() { return mrpTotal; }
   public BigDecimal getProductSavings() { return productSavings; }
-  public String getCouponCode() { return couponCode; }
-  public BigDecimal getCouponDiscount() { return couponDiscount; }
   public BigDecimal getDeliveryFee() { return deliveryFee; }
   public BigDecimal getTotalAmount() { return totalAmount; }
   public int getItemCount() { return itemCount; }

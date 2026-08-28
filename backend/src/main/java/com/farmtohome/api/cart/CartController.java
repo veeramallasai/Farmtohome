@@ -46,18 +46,6 @@ public class CartController {
     return ApiResponse.ok(cart.remove(principal.getName(), itemKey));
   }
 
-  @PostMapping("/coupon")
-  ApiResponse<CartDtos.Cart> coupon(
-      Principal principal,
-      @Valid @RequestBody CartDtos.CouponRequest request) {
-    return ApiResponse.ok(cart.applyCoupon(principal.getName(), request.couponCode()));
-  }
-
-  @DeleteMapping("/coupon")
-  ApiResponse<CartDtos.Cart> removeCoupon(Principal principal) {
-    return ApiResponse.ok(cart.removeCoupon(principal.getName()), "Coupon removed.");
-  }
-
   @DeleteMapping
   ApiResponse<CartDtos.Cart> clear(Principal principal) {
     return ApiResponse.ok(cart.clear(principal.getName()));

@@ -55,7 +55,6 @@ class OrderBackendService {
     required String deliveryMethod,
     required String deliverySlot,
     String? deliveryDate,
-    String couponCode = '',
     double deliveryPartnerTip = 0,
   }) async {
     final double normalizedTip =
@@ -69,7 +68,6 @@ class OrderBackendService {
       'deliveryMethod': deliveryMethod.trim().toLowerCase(),
       'deliveryDate': deliveryDate,
       'deliverySlot': deliverySlot.trim(),
-      'couponCode': couponCode.trim().toUpperCase(),
     };
 
     if (normalizedTip <= 0) {

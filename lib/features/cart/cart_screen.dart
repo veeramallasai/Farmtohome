@@ -5,7 +5,6 @@ import '../../core/theme/app_colors.dart';
 import '../../data/models/cart_item_model.dart';
 import '../../data/models/cart_model.dart';
 import '../../providers/cart_provider.dart';
-import 'widgets/cart_coupon_section.dart';
 import 'widgets/cart_header.dart';
 import 'widgets/cart_item_card.dart';
 import 'widgets/cart_mode_warning.dart';
@@ -35,64 +34,6 @@ class _CartScreenState extends State<CartScreen> {
     super.dispose();
   }
 
-  Future<void> _applyCoupon(String code) async {
-    final CartModel? cart = _provider.cart;
-    final String coupon = code.trim().toUpperCase();
-    if (cart == null || coupon.isEmpty) {
-      _showMessage('Enter a coupon code.');
-      return;
-    }
-
-    double discount;
-    if (coupon == 'FRESH10') {
-      discount = (cart.subtotal * 0.10).clamp(0, 100).toDouble();
-    } else if (coupon == 'WELCOME50' && cart.subtotal >= 299) {
-      discount = 50;
-    } else {
-      _showMessage(
-        coupon == 'WELCOME50'
-            ? 'WELCOME50 requires a minimum cart value of ₹299.'
-            : 'This coupon is not valid.',
-      );
-      return;
-    }
-
-    final bool success = await _provider.applyCoupon(coupon, discount);
-    if (!success)
-      _showMessage(_provider.errorMessage ?? 'Unable to apply coupon.');
-  }
-
-  Future<void> _removeCoupon() async {
-    final bool success = await _provider.applyCoupon('', 0);
-    if (!success)
-      _showMessage(_provider.errorMessage ?? 'Unable to remove coupon.');
-  }
-
-  Future<void> _clearCart() async {
-    final bool? confirmed = await showDialog<bool>(
-      context: context,
-      builder:
-          (BuildContext context) => AlertDialog(
-            title: const Text('Clear cart?'),
-            content: const Text('All products will be removed from your cart.'),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('CANCEL'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('CLEAR'),
-              ),
-            ],
-          ),
-    );
-    if (confirmed != true) return;
-    final bool success = await _provider.clearCart();
-    if (!success)
-      _showMessage(_provider.errorMessage ?? 'Unable to clear cart.');
-  }
-
   void _openDelivery(CartModel cart) {
     Navigator.pushNamed(
       context,
@@ -100,7 +41,7 @@ class _CartScreenState extends State<CartScreen> {
       arguments: <String, dynamic>{
         'shoppingMode': cart.shoppingMode,
         'subtotal': cart.subtotal,
-        'savings': cart.productSavings + cart.couponDiscount,
+        'savings': cart.productSavings,
         'total': cart.total,
         'itemCount': cart.itemCount,
       },
@@ -219,25 +160,14 @@ class _CartScreenState extends State<CartScreen> {
                         ),
                         CartSavingsCard(
                           productSavings: activeCart.productSavings,
-                          couponSavings: activeCart.couponDiscount,
-                        ),
-                        if (activeCart.productSavings +
-                                activeCart.couponDiscount >
-                            0)
-                          const SizedBox(height: 13),
-                        CartCouponSection(
-                          currentCode: activeCart.couponCode,
-                          discount: activeCart.couponDiscount,
-                          isLoading: _provider.isUpdating,
-                          onApply: _applyCoupon,
-                          onRemove: _removeCoupon,
+                          couponSavings: 0,
                         ),
                         const SizedBox(height: 13),
                         CartPriceSummary(
                           subtotal:
                               activeCart.subtotal + activeCart.productSavings,
                           productSavings: activeCart.productSavings,
-                          couponDiscount: activeCart.couponDiscount,
+                          couponDiscount: 0,
                           total: activeCart.total,
                         ),
                       ],

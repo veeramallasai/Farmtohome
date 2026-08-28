@@ -18,8 +18,7 @@ public final class OrderDtos {
       @NotEmpty Map<String, Object> address,
       String deliveryMethod,
       LocalDate deliveryDate,
-      String deliverySlot,
-      String couponCode) {}
+      String deliverySlot) {}
 
   public record CancelRequest(String reason) {}
 
@@ -54,8 +53,6 @@ public final class OrderDtos {
       BigDecimal subtotal,
       BigDecimal mrpTotal,
       BigDecimal productSavings,
-      String couponCode,
-      BigDecimal couponDiscount,
       BigDecimal deliveryFee,
       BigDecimal totalAmount,
       String addressId,

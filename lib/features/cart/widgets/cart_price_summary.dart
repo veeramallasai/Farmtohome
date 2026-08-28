@@ -7,7 +7,7 @@ class CartPriceSummary extends StatelessWidget {
     super.key,
     required this.subtotal,
     required this.productSavings,
-    required this.couponDiscount,
+    this.couponDiscount = 0,
     required this.total,
   });
 

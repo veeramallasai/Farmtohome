@@ -18,7 +18,6 @@ public final class CartDtos {
       @Min(1) @Max(99) int quantity) {}
 
   public record QuantityRequest(@Min(0) @Max(99) int quantity) {}
-  public record CouponRequest(@NotBlank String couponCode) {}
 
   public record Item(
       String id,
@@ -37,8 +36,6 @@ public final class CartDtos {
       String userId,
       String shoppingMode,
       List<Item> items,
-      String couponCode,
-      BigDecimal couponDiscount,
       BigDecimal subtotal,
       BigDecimal productSavings,
       BigDecimal total,

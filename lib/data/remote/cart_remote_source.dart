@@ -46,21 +46,6 @@ class CartRemoteSource {
     await _client.delete('/api/v1/cart/items/$key');
   }
 
-  Future<void> applyCoupon({
-    required String userId,
-    required String couponCode,
-    required double discount,
-  }) async {
-    await _client.post(
-      '/api/v1/cart/coupon',
-      body: <String, dynamic>{'couponCode': couponCode.trim().toUpperCase()},
-    );
-  }
-
-  Future<void> removeCoupon(String userId) async {
-    await _client.delete('/api/v1/cart/coupon');
-  }
-
   Future<void> clearCart(String userId) async {
     await _client.delete('/api/v1/cart');
   }

@@ -1,11 +1,11 @@
+// CheckoutCouponSection removed - Coupons module deleted from project
 import 'package:flutter/material.dart';
 
 class CheckoutCouponSection extends StatelessWidget {
-  const CheckoutCouponSection({super.key, required this.child});
-
-  final Widget child;
+  const CheckoutCouponSection({super.key});
 
   @override
-  Widget build(BuildContext context) =>
-      Semantics(container: true, label: 'Coupon and savings', child: child);
+  Widget build(BuildContext context) {
+    return const SizedBox.shrink();
+  }
 }

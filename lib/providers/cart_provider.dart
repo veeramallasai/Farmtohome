@@ -81,10 +81,6 @@ class CartProvider extends ChangeNotifier {
     return _run(() => _repository.removeItem(itemId));
   }
 
-  Future<bool> applyCoupon(String couponCode, double discount) {
-    return _run(() => _repository.applyCoupon(couponCode, discount));
-  }
-
   Future<bool> clearCart() {
     return _run(_repository.clearCart);
   }

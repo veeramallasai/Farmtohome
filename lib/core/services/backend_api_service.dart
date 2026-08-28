@@ -37,16 +37,5 @@ class BackendApiService {
   Future<ApiResponse<dynamic>> createPayment(Map<String, dynamic> payment) =>
       _client.post(ApiEndpoints.payments, body: payment);
 
-  Future<ApiResponse<dynamic>> validateCoupon({
-    required String code,
-    required double subtotal,
-  }) => _client.post(
-    '${ApiEndpoints.checkout}/coupon',
-    body: <String, dynamic>{
-      'code': code.trim().toUpperCase(),
-      'subtotal': subtotal,
-    },
-  );
-
   void dispose() => _client.dispose();
 }

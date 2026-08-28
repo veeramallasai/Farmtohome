@@ -71,8 +71,6 @@ class LocalCartSource {
     await saveCart(
       cart.copyWith(
         items: <CartItemModel>[],
-        couponCode: '',
-        couponDiscount: 0,
       ),
     );
   }

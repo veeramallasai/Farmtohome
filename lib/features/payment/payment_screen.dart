@@ -123,7 +123,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
         deliveryMethod: widget.deliveryMethod,
         deliveryDate: widget.deliveryDate,
         deliverySlot: widget.deliverySlot,
-        couponCode: widget.couponCode,
         deliveryPartnerTip: _deliveryPartnerTip,
       );
 

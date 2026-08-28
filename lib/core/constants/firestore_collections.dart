@@ -8,7 +8,6 @@ class FirestoreCollections {
   static const String farmers = 'farmers';
   static const String banners = 'banners';
   static const String offers = 'offers';
-  static const String coupons = 'coupons';
   static const String carts = 'carts';
   static const String cartItems = 'items';
   static const String addresses = 'addresses';

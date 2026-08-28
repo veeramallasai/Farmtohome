@@ -40,78 +40,7 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS review_count integer NOT NULL DEFA
 
 CREATE INDEX IF NOT EXISTS idx_products_category_active ON products(category, active);
 
-CREATE TABLE IF NOT EXISTS coupons (
-  id varchar(80) PRIMARY KEY,
-  code varchar(80) NOT NULL UNIQUE,
-  title varchar(180) NOT NULL,
-  discount_type varchar(30) NOT NULL,
-  discount_value numeric(12,2) NOT NULL,
-  minimum_order numeric(12,2) NOT NULL DEFAULT 0,
-  maximum_discount numeric(12,2) NOT NULL DEFAULT 0,
-  active boolean NOT NULL DEFAULT true,
-  deleted boolean NOT NULL DEFAULT false,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
-DO $$
-BEGIN
-  BEGIN
-    ALTER TABLE coupons ALTER COLUMN id TYPE varchar(80) USING id::text;
-  EXCEPTION
-    WHEN OTHERS THEN NULL;
-  END;
-END $$;
-ALTER TABLE coupons ADD COLUMN IF NOT EXISTS code varchar(80) NOT NULL DEFAULT '';
-ALTER TABLE coupons ADD COLUMN IF NOT EXISTS title varchar(180) NOT NULL DEFAULT '';
-ALTER TABLE coupons ADD COLUMN IF NOT EXISTS discount_type varchar(30) NOT NULL DEFAULT 'percentage';
-ALTER TABLE coupons ADD COLUMN IF NOT EXISTS discount_value numeric(12,2) NOT NULL DEFAULT 0;
-ALTER TABLE coupons ADD COLUMN IF NOT EXISTS minimum_order numeric(12,2) NOT NULL DEFAULT 0;
-ALTER TABLE coupons ADD COLUMN IF NOT EXISTS maximum_discount numeric(12,2) NOT NULL DEFAULT 0;
-ALTER TABLE coupons ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true;
-ALTER TABLE coupons ADD COLUMN IF NOT EXISTS deleted boolean NOT NULL DEFAULT false;
-ALTER TABLE coupons ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
-ALTER TABLE coupons ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 
-DO $$
-DECLARE
-  r RECORD;
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'coupons'
-      AND column_name = 'coupon_code'
-      AND table_schema = current_schema()
-  ) THEN
-    IF EXISTS (
-      SELECT 1 FROM information_schema.columns
-      WHERE table_name = 'coupons'
-        AND column_name = 'code'
-        AND table_schema = current_schema()
-    ) THEN
-      EXECUTE 'UPDATE coupons SET code = coupon_code WHERE (code IS NULL OR code = '''') AND coupon_code IS NOT NULL AND coupon_code != ''''';
-    END IF;
-    ALTER TABLE coupons ALTER COLUMN coupon_code DROP NOT NULL;
-    ALTER TABLE coupons ALTER COLUMN coupon_code SET DEFAULT '';
-  END IF;
-
-  FOR r IN
-    SELECT column_name
-    FROM information_schema.columns
-    WHERE table_name = 'coupons'
-      AND table_schema = current_schema()
-      AND is_nullable = 'NO'
-      AND column_default IS NULL
-      AND column_name NOT IN (
-        'id', 'code', 'title', 'discount_type', 'discount_value',
-        'minimum_order', 'maximum_discount', 'active', 'deleted',
-        'created_at', 'updated_at'
-      )
-  LOOP
-    EXECUTE format('ALTER TABLE coupons ALTER COLUMN %I DROP NOT NULL', r.column_name);
-  END LOOP;
-EXCEPTION
-  WHEN OTHERS THEN NULL;
-END $$;
 
 CREATE TABLE IF NOT EXISTS carts (
   owner_uid varchar(160) PRIMARY KEY,

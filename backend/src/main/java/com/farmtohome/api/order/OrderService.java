@@ -108,8 +108,6 @@ public class OrderService {
           price, mrp, item.getQuantity()));
     }
 
-    String couponCode = safe(request.couponCode(), cart.getCouponCode()).toUpperCase();
-    BigDecimal couponDiscount = cartService.calculateDiscount(couponCode, subtotal);
     String deliveryMethod = safe(request.deliveryMethod(), "quick").toLowerCase();
     if (!List.of("quick", "scheduled", "preorder", "pre_order").contains(deliveryMethod)) {
       throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid delivery method.");
@@ -118,7 +116,7 @@ public class OrderService {
         ? BigDecimal.ZERO
         : deliveryMethod.equals("scheduled") ? BigDecimal.valueOf(20)
         : deliveryMethod.startsWith("pre") ? BigDecimal.ZERO : BigDecimal.valueOf(35);
-    BigDecimal total = CartService.money(subtotal.subtract(couponDiscount).add(deliveryFee));
+    BigDecimal total = CartService.money(subtotal.add(deliveryFee));
     String orderNumber = "FTH" + System.currentTimeMillis() % 10_000_000L
         + ThreadLocalRandom.current().nextInt(10, 99);
     Map<String, Object> deliveryAddress = addressService.snapshot(uid, request.addressId());
@@ -131,15 +129,14 @@ public class OrderService {
 
     OrderEntity order = new OrderEntity(
         orderId, orderNumber, uid, mode, paymentId,
-        CartService.money(subtotal), CartService.money(mrpTotal), couponDiscount,
-        CartService.money(deliveryFee), total, itemCount, couponCode,
+        CartService.money(subtotal), CartService.money(mrpTotal),
+        CartService.money(deliveryFee), total, itemCount,
         request.addressId().trim(), addressJson, deliveryMethod, request.deliveryDate(),
         safe(request.deliverySlot(), "Earliest available"));
     orders.save(order);
     orderItems.saveAll(savedItems);
     payments.save(new PaymentEntity(paymentId, orderId, uid, total));
     cartItems.deleteByOwnerUid(uid);
-    cart.setCouponCode("");
     cart.touch();
     carts.save(cart);
 
@@ -265,7 +262,7 @@ public class OrderService {
         order.getOwnerUid(), order.getShoppingMode(), order.getStatus(),
         order.getPaymentStatus(), order.getPaymentMethod(), order.getPaymentId().toString(),
         "", items, order.getItemCount(), order.getSubtotal(), order.getMrpTotal(),
-        order.getProductSavings(), order.getCouponCode(), order.getCouponDiscount(),
+        order.getProductSavings(),
         order.getDeliveryFee(), order.getTotalAmount(), order.getAddressId(), address,
         order.getDeliveryMethod(), order.getDeliveryDate(), order.getDeliverySlot(),
         order.getCancellationReason(), history, order.getCreatedAt(), order.getUpdatedAt());

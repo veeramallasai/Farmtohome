@@ -1,8 +1,6 @@
 package com.farmtohome.api.cart;
 
 import com.farmtohome.api.common.ApiException;
-import com.farmtohome.api.coupon.CouponEntity;
-import com.farmtohome.api.coupon.CouponRepository;
 import com.farmtohome.api.product.ProductEntity;
 import com.farmtohome.api.product.ProductRepository;
 import java.math.BigDecimal;
@@ -23,17 +21,14 @@ public class CartService {
   private final CartRepository carts;
   private final CartItemRepository items;
   private final ProductRepository products;
-  private final CouponRepository coupons;
 
   public CartService(
       CartRepository carts,
       CartItemRepository items,
-      ProductRepository products,
-      CouponRepository coupons) {
+      ProductRepository products) {
     this.carts = carts;
     this.items = items;
     this.products = products;
-    this.coupons = coupons;
   }
 
   @Transactional(readOnly = true)
@@ -107,35 +102,9 @@ public class CartService {
   }
 
   @Transactional
-  public CartDtos.Cart applyCoupon(String uid, String couponCode) {
-    CouponEntity coupon = coupons.findByCodeIgnoreCaseAndActiveTrue(couponCode.trim())
-        .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Coupon code is not valid."));
-    CartEntity cart = carts.findById(uid).orElseGet(() -> new CartEntity(uid, "home"));
-    CartDtos.Cart current = build(uid, cart, items.findByOwnerUidOrderByUpdatedAtDesc(uid));
-    if (current.subtotal().compareTo(coupon.getMinimumOrder()) < 0) {
-      throw new ApiException(HttpStatus.CONFLICT,
-          "Minimum order for this coupon is ₹" + coupon.getMinimumOrder().setScale(0));
-    }
-    cart.setCouponCode(coupon.getCode());
-    cart.touch();
-    carts.save(cart);
-    return view(uid);
-  }
-
-  @Transactional
-  public CartDtos.Cart removeCoupon(String uid) {
-    CartEntity cart = carts.findById(uid).orElseGet(() -> new CartEntity(uid, "home"));
-    cart.setCouponCode("");
-    cart.touch();
-    carts.save(cart);
-    return view(uid);
-  }
-
-  @Transactional
   public CartDtos.Cart clear(String uid) {
     items.deleteByOwnerUid(uid);
     CartEntity cart = carts.findById(uid).orElseGet(() -> new CartEntity(uid, "home"));
-    cart.setCouponCode("");
     cart.touch();
     carts.save(cart);
     return view(uid);
@@ -163,27 +132,11 @@ public class CartService {
           product.getCategory(), item.getUnit(), item.getShoppingMode(), price, mrp,
           item.getQuantity(), ""));
     }
-    BigDecimal discount = calculateDiscount(cart.getCouponCode(), subtotal);
-    BigDecimal total = subtotal.subtract(discount).max(ZERO);
+    BigDecimal total = subtotal.max(ZERO);
     return new CartDtos.Cart(
-        uid, cart.getShoppingMode(), result, cart.getCouponCode(), money(discount),
+        uid, cart.getShoppingMode(), result,
         money(subtotal), money(mrpTotal.subtract(subtotal).max(ZERO)), money(total),
         itemCount, cart.getUpdatedAt() == null ? Instant.now() : cart.getUpdatedAt());
-  }
-
-  public BigDecimal calculateDiscount(String code, BigDecimal subtotal) {
-    if (code == null || code.isBlank()) return ZERO;
-    return coupons.findByCodeIgnoreCaseAndActiveTrue(code).map(coupon -> {
-      if (subtotal.compareTo(coupon.getMinimumOrder()) < 0) return ZERO;
-      BigDecimal discount = "fixed".equalsIgnoreCase(coupon.getDiscountType())
-          ? coupon.getDiscountValue()
-          : subtotal.multiply(coupon.getDiscountValue())
-              .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-      if (coupon.getMaximumDiscount().signum() > 0) {
-        discount = discount.min(coupon.getMaximumDiscount());
-      }
-      return money(discount.min(subtotal));
-    }).orElse(ZERO);
   }
 
   public static BigDecimal money(BigDecimal value) {

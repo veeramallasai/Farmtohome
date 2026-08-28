@@ -7,16 +7,12 @@ class CartModel {
     required this.userId,
     required this.shoppingMode,
     required List<CartItemModel> items,
-    this.couponCode = '',
-    this.couponDiscount = 0,
     this.updatedAt,
   }) : items = List<CartItemModel>.unmodifiable(items);
 
   final String userId;
   final String shoppingMode;
   final List<CartItemModel> items;
-  final String couponCode;
-  final double couponDiscount;
   final DateTime? updatedAt;
 
   int get itemCount => items.fold<int>(
@@ -31,8 +27,7 @@ class CartModel {
     0,
     (double total, CartItemModel item) => total + item.savings,
   );
-  double get total =>
-      (subtotal - couponDiscount).clamp(0, double.infinity).toDouble();
+  double get total => subtotal.clamp(0, double.infinity).toDouble();
   bool get isEmpty => items.isEmpty;
 
   factory CartModel.empty(String userId, {String shoppingMode = 'home'}) {
@@ -77,8 +72,6 @@ class CartModel {
       shoppingMode:
           _text(map['shoppingMode']).toLowerCase() == 'shop' ? 'shop' : 'home',
       items: items,
-      couponCode: _text(map['couponCode']),
-      couponDiscount: _toDouble(map['couponDiscount']),
       updatedAt: _toDateTime(map['updatedAt']),
     );
   }
@@ -87,8 +80,6 @@ class CartModel {
     'userId': userId,
     'shoppingMode': shoppingMode,
     'items': items.map((CartItemModel item) => item.toMap()).toList(),
-    'couponCode': couponCode,
-    'couponDiscount': couponDiscount,
     if (updatedAt != null) 'updatedAt': Timestamp.fromDate(updatedAt!),
   };
 
@@ -96,16 +87,12 @@ class CartModel {
     String? userId,
     String? shoppingMode,
     List<CartItemModel>? items,
-    String? couponCode,
-    double? couponDiscount,
     DateTime? updatedAt,
   }) {
     return CartModel(
       userId: userId ?? this.userId,
       shoppingMode: shoppingMode ?? this.shoppingMode,
       items: items ?? this.items,
-      couponCode: couponCode ?? this.couponCode,
-      couponDiscount: couponDiscount ?? this.couponDiscount,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }

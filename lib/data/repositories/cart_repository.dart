@@ -50,18 +50,6 @@ class CartRepository {
     return _remoteSource.removeItem(_requireUserId(), itemId);
   }
 
-  Future<void> applyCoupon(String couponCode, double discount) {
-    return _remoteSource.applyCoupon(
-      userId: _requireUserId(),
-      couponCode: couponCode,
-      discount: discount,
-    );
-  }
-
-  Future<void> removeCoupon() {
-    return _remoteSource.removeCoupon(_requireUserId());
-  }
-
   Future<void> clearCart() {
     return _remoteSource.clearCart(_requireUserId());
   }
