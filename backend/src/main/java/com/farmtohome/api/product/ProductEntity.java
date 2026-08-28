@@ -11,6 +11,7 @@ import java.time.Instant;
 @Table(name = "products")
 public class ProductEntity {
   @Id
+  @Column(length = 120)
   private String id;
   @Column(nullable = false)
   private String name;

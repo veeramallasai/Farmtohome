@@ -20,6 +20,19 @@ CREATE TABLE IF NOT EXISTS products (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'products' AND column_name = 'id' AND udt_name = 'uuid'
+  ) THEN
+    ALTER TABLE products ALTER COLUMN id TYPE varchar(120) USING id::text;
+  END IF;
+EXCEPTION
+  WHEN OTHERS THEN NULL;
+END $$;
+
 ALTER TABLE products ADD COLUMN IF NOT EXISTS name varchar(255) NOT NULL DEFAULT '';
 ALTER TABLE products ADD COLUMN IF NOT EXISTS english_name varchar(160) NOT NULL DEFAULT '';
 ALTER TABLE products ADD COLUMN IF NOT EXISTS telugu_name varchar(160) NOT NULL DEFAULT '';
