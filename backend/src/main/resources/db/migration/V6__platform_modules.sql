@@ -1,66 +1,4 @@
--- V6__platform_modules.sql - Complete, Fully Idempotent Platform Modules Migration with Universal Column Safeguards
-
--- STEP 1: Global Pre-Migration Column Reconciliation & Universal Nullability Drop
-DO $$
-DECLARE
-  tbl text;
-  col text;
-  rec RECORD;
-BEGIN
-  FOR tbl IN VALUES ('categories', 'banners', 'offers', 'farmers', 'delivery_slots', 'favorites', 'reviews', 'notifications', 'support_tickets', 'device_tokens', 'payment_events') LOOP
-    -- 1.1 Drop NOT NULL on all optional/legacy boolean/status/timestamp columns
-    FOR col IN VALUES ('is_active', 'active', 'is_available', 'available', 'is_deleted', 'deleted', 'is_read', 'verified', 'is_verified', 'verified_purchase', 'signature_verified', 'starts_at', 'ends_at', 'slot_date', 'processed_at', 'last_seen_at') LOOP
-      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = tbl AND column_name = col) THEN
-        BEGIN
-          EXECUTE format('ALTER TABLE %I ALTER COLUMN %I DROP NOT NULL', tbl, col);
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
-      END IF;
-    END LOOP;
-
-    -- 1.2 Reconcile legacy is_active vs active
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = tbl AND column_name = 'is_active') THEN
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = tbl AND column_name = 'active') THEN
-          EXECUTE format('ALTER TABLE %I RENAME COLUMN is_active TO active', tbl);
-        ELSE
-          EXECUTE format('ALTER TABLE %I ALTER COLUMN is_active SET DEFAULT true', tbl);
-          EXECUTE format('UPDATE %I SET is_active = active WHERE is_active IS NULL', tbl);
-        END IF;
-      EXCEPTION WHEN OTHERS THEN NULL;
-      END;
-    END IF;
-
-    -- 1.3 Reconcile legacy is_available vs available
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = tbl AND column_name = 'is_available') THEN
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = tbl AND column_name = 'available') THEN
-          EXECUTE format('ALTER TABLE %I RENAME COLUMN is_available TO available', tbl);
-        ELSE
-          EXECUTE format('ALTER TABLE %I ALTER COLUMN is_available SET DEFAULT true', tbl);
-          EXECUTE format('UPDATE %I SET is_available = available WHERE is_available IS NULL', tbl);
-        END IF;
-      EXCEPTION WHEN OTHERS THEN NULL;
-      END;
-    END IF;
-
-    -- 1.4 Drop NOT NULL on any non-primary key column that lacks a default value
-    FOR rec IN
-      SELECT column_name
-      FROM information_schema.columns
-      WHERE table_name = tbl
-        AND table_schema = current_schema()
-        AND is_nullable = 'NO'
-        AND column_name <> 'id'
-        AND column_default IS NULL
-    LOOP
-      BEGIN
-        EXECUTE format('ALTER TABLE %I ALTER COLUMN %I DROP NOT NULL', tbl, rec.column_name);
-      EXCEPTION WHEN OTHERS THEN NULL;
-      END;
-    END LOOP;
-  END LOOP;
-END $$;
+-- V6__platform_modules.sql - Clean Platform Modules Migration
 
 -- 1. categories table
 CREATE TABLE IF NOT EXISTS categories (
@@ -142,8 +80,10 @@ ALTER TABLE categories ALTER COLUMN updated_at SET DEFAULT now();
 
 CREATE INDEX IF NOT EXISTS idx_categories_active_sort ON categories(active, sort_order);
 
--- 2. banners table
-CREATE TABLE IF NOT EXISTS banners (
+-- 2. banners table (Recreated cleanly to drop broken legacy dev columns)
+DROP TABLE IF EXISTS banners CASCADE;
+
+CREATE TABLE banners (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   title varchar(200) NOT NULL DEFAULT '',
   subtitle varchar(500) NOT NULL DEFAULT '',
@@ -159,69 +99,12 @@ CREATE TABLE IF NOT EXISTS banners (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'banners' AND column_name = 'id'
-      AND data_type NOT IN ('uuid')
-  ) THEN
-    ALTER TABLE banners ALTER COLUMN id TYPE uuid USING (
-      CASE WHEN id ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
-           THEN id::uuid
-           ELSE gen_random_uuid()
-      END
-    );
-  END IF;
+CREATE INDEX idx_banners_visible ON banners(active, priority);
 
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'banners' AND column_name = 'title') THEN
-    ALTER TABLE banners ADD COLUMN title varchar(200) NOT NULL DEFAULT '';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'banners' AND column_name = 'subtitle') THEN
-    ALTER TABLE banners ADD COLUMN subtitle varchar(500) NOT NULL DEFAULT '';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'banners' AND column_name = 'image_url') THEN
-    ALTER TABLE banners ADD COLUMN image_url varchar(500) NOT NULL DEFAULT '';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'banners' AND column_name = 'action_label') THEN
-    ALTER TABLE banners ADD COLUMN action_label varchar(100) NOT NULL DEFAULT '';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'banners' AND column_name = 'route') THEN
-    ALTER TABLE banners ADD COLUMN route varchar(300) NOT NULL DEFAULT '';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'banners' AND column_name = 'priority') THEN
-    ALTER TABLE banners ADD COLUMN priority integer NOT NULL DEFAULT 0;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'banners' AND column_name = 'active') THEN
-    ALTER TABLE banners ADD COLUMN active boolean NOT NULL DEFAULT true;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'banners' AND column_name = 'deleted') THEN
-    ALTER TABLE banners ADD COLUMN deleted boolean NOT NULL DEFAULT false;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'banners' AND column_name = 'created_at') THEN
-    ALTER TABLE banners ADD COLUMN created_at timestamptz NOT NULL DEFAULT now();
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'banners' AND column_name = 'updated_at') THEN
-    ALTER TABLE banners ADD COLUMN updated_at timestamptz NOT NULL DEFAULT now();
-  END IF;
-END $$;
+-- 3. offers table (Recreated cleanly to drop broken legacy dev columns)
+DROP TABLE IF EXISTS offers CASCADE;
 
-UPDATE banners SET active = true WHERE active IS NULL;
-UPDATE banners SET deleted = false WHERE deleted IS NULL;
-UPDATE banners SET priority = 0 WHERE priority IS NULL;
-UPDATE banners SET created_at = now() WHERE created_at IS NULL;
-UPDATE banners SET updated_at = now() WHERE updated_at IS NULL;
-
-ALTER TABLE banners ALTER COLUMN active SET DEFAULT true;
-ALTER TABLE banners ALTER COLUMN deleted SET DEFAULT false;
-ALTER TABLE banners ALTER COLUMN priority SET DEFAULT 0;
-ALTER TABLE banners ALTER COLUMN created_at SET DEFAULT now();
-ALTER TABLE banners ALTER COLUMN updated_at SET DEFAULT now();
-
-CREATE INDEX IF NOT EXISTS idx_banners_visible ON banners(active, priority);
-
--- 3. offers table
-CREATE TABLE IF NOT EXISTS offers (
+CREATE TABLE offers (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   title varchar(200) NOT NULL DEFAULT '',
   description varchar(500) NOT NULL DEFAULT '',
@@ -239,73 +122,12 @@ CREATE TABLE IF NOT EXISTS offers (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'offers' AND column_name = 'id'
-      AND data_type NOT IN ('uuid')
-  ) THEN
-    ALTER TABLE offers ALTER COLUMN id TYPE uuid USING (
-      CASE WHEN id ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
-           THEN id::uuid
-           ELSE gen_random_uuid()
-      END
-    );
-  END IF;
+CREATE INDEX idx_offers_active ON offers(active, starts_at, ends_at);
 
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'title') THEN
-    ALTER TABLE offers ADD COLUMN title varchar(200) NOT NULL DEFAULT '';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'description') THEN
-    ALTER TABLE offers ADD COLUMN description varchar(500) NOT NULL DEFAULT '';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'discount_type') THEN
-    ALTER TABLE offers ADD COLUMN discount_type varchar(30) NOT NULL DEFAULT 'percentage';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'discount_value') THEN
-    ALTER TABLE offers ADD COLUMN discount_value numeric(12,2) NOT NULL DEFAULT 0;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'minimum_order') THEN
-    ALTER TABLE offers ADD COLUMN minimum_order numeric(12,2) NOT NULL DEFAULT 0;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'maximum_discount') THEN
-    ALTER TABLE offers ADD COLUMN maximum_discount numeric(12,2) NOT NULL DEFAULT 0;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'image_url') THEN
-    ALTER TABLE offers ADD COLUMN image_url varchar(500) NOT NULL DEFAULT '';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'active') THEN
-    ALTER TABLE offers ADD COLUMN active boolean NOT NULL DEFAULT true;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'deleted') THEN
-    ALTER TABLE offers ADD COLUMN deleted boolean NOT NULL DEFAULT false;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'created_at') THEN
-    ALTER TABLE offers ADD COLUMN created_at timestamptz NOT NULL DEFAULT now();
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'updated_at') THEN
-    ALTER TABLE offers ADD COLUMN updated_at timestamptz NOT NULL DEFAULT now();
-  END IF;
-END $$;
+-- 4. farmers table (Recreated cleanly to drop broken legacy dev columns)
+DROP TABLE IF EXISTS farmers CASCADE;
 
-UPDATE offers SET active = true WHERE active IS NULL;
-UPDATE offers SET deleted = false WHERE deleted IS NULL;
-UPDATE offers SET discount_value = 0 WHERE discount_value IS NULL;
-UPDATE offers SET minimum_order = 0 WHERE minimum_order IS NULL;
-UPDATE offers SET maximum_discount = 0 WHERE maximum_discount IS NULL;
-UPDATE offers SET created_at = now() WHERE created_at IS NULL;
-UPDATE offers SET updated_at = now() WHERE updated_at IS NULL;
-
-ALTER TABLE offers ALTER COLUMN active SET DEFAULT true;
-ALTER TABLE offers ALTER COLUMN deleted SET DEFAULT false;
-ALTER TABLE offers ALTER COLUMN created_at SET DEFAULT now();
-ALTER TABLE offers ALTER COLUMN updated_at SET DEFAULT now();
-
-CREATE INDEX IF NOT EXISTS idx_offers_active ON offers(active, starts_at, ends_at);
-
--- 4. farmers table
-CREATE TABLE IF NOT EXISTS farmers (
+CREATE TABLE farmers (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name varchar(180) NOT NULL DEFAULT '',
   farm_name varchar(220) NOT NULL DEFAULT '',
@@ -322,80 +144,12 @@ CREATE TABLE IF NOT EXISTS farmers (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'farmers' AND column_name = 'id'
-      AND data_type NOT IN ('uuid')
-  ) THEN
-    ALTER TABLE farmers ALTER COLUMN id TYPE uuid USING (
-      CASE WHEN id ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
-           THEN id::uuid
-           ELSE gen_random_uuid()
-      END
-    );
-  END IF;
+CREATE INDEX idx_farmers_active_rating ON farmers(active, verified DESC, rating DESC);
 
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'farmers' AND column_name = 'name') THEN
-    ALTER TABLE farmers ADD COLUMN name varchar(180) NOT NULL DEFAULT '';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'farmers' AND column_name = 'farm_name') THEN
-    ALTER TABLE farmers ADD COLUMN farm_name varchar(220) NOT NULL DEFAULT '';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'farmers' AND column_name = 'location') THEN
-    ALTER TABLE farmers ADD COLUMN location varchar(250) NOT NULL DEFAULT '';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'farmers' AND column_name = 'image_url') THEN
-    ALTER TABLE farmers ADD COLUMN image_url varchar(500) NOT NULL DEFAULT '';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'farmers' AND column_name = 'rating') THEN
-    ALTER TABLE farmers ADD COLUMN rating numeric(3,2) NOT NULL DEFAULT 0;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'farmers' AND column_name = 'review_count') THEN
-    ALTER TABLE farmers ADD COLUMN review_count integer NOT NULL DEFAULT 0;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'farmers' AND column_name = 'verified') THEN
-    ALTER TABLE farmers ADD COLUMN verified boolean NOT NULL DEFAULT false;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'farmers' AND column_name = 'experience_years') THEN
-    ALTER TABLE farmers ADD COLUMN experience_years integer NOT NULL DEFAULT 0;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'farmers' AND column_name = 'speciality') THEN
-    ALTER TABLE farmers ADD COLUMN speciality varchar(250) NOT NULL DEFAULT '';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'farmers' AND column_name = 'active') THEN
-    ALTER TABLE farmers ADD COLUMN active boolean NOT NULL DEFAULT true;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'farmers' AND column_name = 'deleted') THEN
-    ALTER TABLE farmers ADD COLUMN deleted boolean NOT NULL DEFAULT false;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'farmers' AND column_name = 'created_at') THEN
-    ALTER TABLE farmers ADD COLUMN created_at timestamptz NOT NULL DEFAULT now();
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'farmers' AND column_name = 'updated_at') THEN
-    ALTER TABLE farmers ADD COLUMN updated_at timestamptz NOT NULL DEFAULT now();
-  END IF;
-END $$;
+-- 5. delivery_slots table (Recreated cleanly to drop broken legacy dev columns)
+DROP TABLE IF EXISTS delivery_slots CASCADE;
 
-UPDATE farmers SET active = true WHERE active IS NULL;
-UPDATE farmers SET deleted = false WHERE deleted IS NULL;
-UPDATE farmers SET verified = false WHERE verified IS NULL;
-UPDATE farmers SET rating = 0 WHERE rating IS NULL;
-UPDATE farmers SET review_count = 0 WHERE review_count IS NULL;
-UPDATE farmers SET experience_years = 0 WHERE experience_years IS NULL;
-UPDATE farmers SET created_at = now() WHERE created_at IS NULL;
-UPDATE farmers SET updated_at = now() WHERE updated_at IS NULL;
-
-ALTER TABLE farmers ALTER COLUMN active SET DEFAULT true;
-ALTER TABLE farmers ALTER COLUMN deleted SET DEFAULT false;
-ALTER TABLE farmers ALTER COLUMN created_at SET DEFAULT now();
-ALTER TABLE farmers ALTER COLUMN updated_at SET DEFAULT now();
-
-CREATE INDEX IF NOT EXISTS idx_farmers_active_rating ON farmers(active, verified DESC, rating DESC);
-
--- 5. delivery_slots table
-CREATE TABLE IF NOT EXISTS delivery_slots (
+CREATE TABLE delivery_slots (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   method varchar(40) NOT NULL DEFAULT 'standard',
   label varchar(160) NOT NULL DEFAULT '',
@@ -410,68 +164,7 @@ CREATE TABLE IF NOT EXISTS delivery_slots (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'delivery_slots' AND column_name = 'id'
-      AND data_type NOT IN ('uuid')
-  ) THEN
-    ALTER TABLE delivery_slots ALTER COLUMN id TYPE uuid USING (
-      CASE WHEN id ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
-           THEN id::uuid
-           ELSE gen_random_uuid()
-      END
-    );
-  END IF;
-
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_slots' AND column_name = 'method') THEN
-    ALTER TABLE delivery_slots ADD COLUMN method varchar(40) NOT NULL DEFAULT 'standard';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_slots' AND column_name = 'label') THEN
-    ALTER TABLE delivery_slots ADD COLUMN label varchar(160) NOT NULL DEFAULT '';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_slots' AND column_name = 'start_time') THEN
-    ALTER TABLE delivery_slots ADD COLUMN start_time time NOT NULL DEFAULT '08:00:00';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_slots' AND column_name = 'end_time') THEN
-    ALTER TABLE delivery_slots ADD COLUMN end_time time NOT NULL DEFAULT '20:00:00';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_slots' AND column_name = 'fee') THEN
-    ALTER TABLE delivery_slots ADD COLUMN fee numeric(12,2) NOT NULL DEFAULT 0;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_slots' AND column_name = 'available') THEN
-    ALTER TABLE delivery_slots ADD COLUMN available boolean NOT NULL DEFAULT true;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_slots' AND column_name = 'capacity') THEN
-    ALTER TABLE delivery_slots ADD COLUMN capacity integer NOT NULL DEFAULT 0;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_slots' AND column_name = 'booked_count') THEN
-    ALTER TABLE delivery_slots ADD COLUMN booked_count integer NOT NULL DEFAULT 0;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_slots' AND column_name = 'slot_date') THEN
-    ALTER TABLE delivery_slots ADD COLUMN slot_date date;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_slots' AND column_name = 'created_at') THEN
-    ALTER TABLE delivery_slots ADD COLUMN created_at timestamptz NOT NULL DEFAULT now();
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_slots' AND column_name = 'updated_at') THEN
-    ALTER TABLE delivery_slots ADD COLUMN updated_at timestamptz NOT NULL DEFAULT now();
-  END IF;
-END $$;
-
-UPDATE delivery_slots SET available = true WHERE available IS NULL;
-UPDATE delivery_slots SET fee = 0 WHERE fee IS NULL;
-UPDATE delivery_slots SET capacity = 0 WHERE capacity IS NULL;
-UPDATE delivery_slots SET booked_count = 0 WHERE booked_count IS NULL;
-UPDATE delivery_slots SET created_at = now() WHERE created_at IS NULL;
-UPDATE delivery_slots SET updated_at = now() WHERE updated_at IS NULL;
-
-ALTER TABLE delivery_slots ALTER COLUMN available SET DEFAULT true;
-ALTER TABLE delivery_slots ALTER COLUMN created_at SET DEFAULT now();
-ALTER TABLE delivery_slots ALTER COLUMN updated_at SET DEFAULT now();
-
-CREATE INDEX IF NOT EXISTS idx_delivery_slots_lookup ON delivery_slots(method, slot_date, available, start_time);
+CREATE INDEX idx_delivery_slots_lookup ON delivery_slots(method, slot_date, available, start_time);
 
 -- 6. Dynamic foreign key cleanup and product_id type alignment
 DO $$
