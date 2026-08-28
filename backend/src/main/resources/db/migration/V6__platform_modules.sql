@@ -1,4 +1,4 @@
--- V6__platform_modules.sql - Complete, Fully Idempotent Platform Modules Migration with UUID Primary Keys
+-- V6__platform_modules.sql - Complete, Fully Idempotent Platform Modules Migration with UUID Primary Keys & Legacy Column Safeguards
 
 -- 1. categories table
 CREATE TABLE IF NOT EXISTS categories (
@@ -60,28 +60,6 @@ ALTER TABLE categories ALTER COLUMN active SET DEFAULT true;
 ALTER TABLE categories ALTER COLUMN deleted SET DEFAULT false;
 ALTER TABLE categories ALTER COLUMN created_at SET DEFAULT now();
 ALTER TABLE categories ALTER COLUMN updated_at SET DEFAULT now();
-
-DO $$
-DECLARE
-  col RECORD;
-BEGIN
-  FOR col IN
-    SELECT column_name
-    FROM information_schema.columns
-    WHERE table_name = 'categories'
-      AND table_schema = current_schema()
-      AND is_nullable = 'NO'
-      AND column_name NOT IN (
-        'id', 'name', 'description', 'image_url', 'icon_name', 
-        'sort_order', 'active', 'deleted', 'created_at', 'updated_at'
-      )
-  LOOP
-    BEGIN
-      EXECUTE format('ALTER TABLE categories ALTER COLUMN %I DROP NOT NULL', col.column_name);
-    EXCEPTION WHEN OTHERS THEN NULL;
-    END;
-  END LOOP;
-END $$;
 
 CREATE INDEX IF NOT EXISTS idx_categories_active_sort ON categories(active, sort_order);
 
@@ -586,7 +564,56 @@ ALTER TABLE payment_events ALTER COLUMN created_at SET DEFAULT now();
 
 CREATE INDEX IF NOT EXISTS idx_payment_events_payment ON payment_events(payment_id, created_at DESC);
 
--- 14. Seed Data (Fully Idempotent with UUID PKs and business key existence guards)
+-- 14. Global Safeguard for Pre-existing NOT NULL / Legacy Columns
+DO $$
+DECLARE
+  tbl text;
+  col RECORD;
+BEGIN
+  FOR tbl IN VALUES ('categories', 'banners', 'offers', 'farmers', 'delivery_slots', 'favorites', 'reviews', 'notifications', 'support_tickets', 'device_tokens', 'payment_events') LOOP
+    -- Drop NOT NULL and set DEFAULT for is_active if it exists on pre-existing Railway table
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns WHERE table_name = tbl AND column_name = 'is_active'
+    ) THEN
+      BEGIN
+        EXECUTE format('UPDATE %I SET is_active = true WHERE is_active IS NULL', tbl);
+        EXECUTE format('ALTER TABLE %I ALTER COLUMN is_active SET DEFAULT true', tbl);
+        EXECUTE format('ALTER TABLE %I ALTER COLUMN is_active DROP NOT NULL', tbl);
+      EXCEPTION WHEN OTHERS THEN NULL;
+      END;
+    END IF;
+
+    -- Drop NOT NULL and set DEFAULT for is_available if it exists on pre-existing Railway table
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns WHERE table_name = tbl AND column_name = 'is_available'
+    ) THEN
+      BEGIN
+        EXECUTE format('UPDATE %I SET is_available = true WHERE is_available IS NULL', tbl);
+        EXECUTE format('ALTER TABLE %I ALTER COLUMN is_available SET DEFAULT true', tbl);
+        EXECUTE format('ALTER TABLE %I ALTER COLUMN is_available DROP NOT NULL', tbl);
+      EXCEPTION WHEN OTHERS THEN NULL;
+      END;
+    END IF;
+
+    -- For any non-primary key column on tbl that is NOT NULL and lacks a default value, drop NOT NULL constraint
+    FOR col IN
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = tbl
+        AND table_schema = current_schema()
+        AND is_nullable = 'NO'
+        AND column_name <> 'id'
+        AND column_default IS NULL
+    LOOP
+      BEGIN
+        EXECUTE format('ALTER TABLE %I ALTER COLUMN %I DROP NOT NULL', tbl, col.column_name);
+      EXCEPTION WHEN OTHERS THEN NULL;
+      END;
+    END LOOP;
+  END LOOP;
+END $$;
+
+-- 15. Seed Data (Fully Idempotent with UUID PKs and business key existence guards)
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Vegetables') THEN
