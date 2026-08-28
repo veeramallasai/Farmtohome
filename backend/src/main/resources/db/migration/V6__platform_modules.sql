@@ -183,35 +183,75 @@ BEGIN
   END IF;
 END $$;
 
+DO $$
+DECLARE
+  tbl text;
+BEGIN
+  FOR tbl IN VALUES ('favorites', 'reviews', 'notifications', 'support_tickets', 'device_tokens', 'payment_events') LOOP
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = tbl AND column_name = 'user_id'
+    ) AND NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = tbl AND column_name = 'owner_uid'
+    ) THEN
+      EXECUTE format('ALTER TABLE %I RENAME COLUMN user_id TO owner_uid', tbl);
+    END IF;
+
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = tbl AND column_name = 'user_uid'
+    ) AND NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = tbl AND column_name = 'owner_uid'
+    ) THEN
+      EXECUTE format('ALTER TABLE %I RENAME COLUMN user_uid TO owner_uid', tbl);
+    END IF;
+  END LOOP;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
 CREATE TABLE IF NOT EXISTS favorites (
   id bigserial PRIMARY KEY,
-  owner_uid varchar(160) NOT NULL,
-  product_id varchar(120) NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT uk_favorites_owner_product UNIQUE (owner_uid, product_id)
+  owner_uid varchar(160) NOT NULL DEFAULT '',
+  product_id varchar(120) NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE favorites ADD COLUMN IF NOT EXISTS owner_uid varchar(160) NOT NULL DEFAULT '';
+ALTER TABLE favorites ADD COLUMN IF NOT EXISTS product_id varchar(120) NOT NULL DEFAULT '';
+ALTER TABLE favorites ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+
 CREATE INDEX IF NOT EXISTS idx_favorites_owner ON favorites(owner_uid, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS reviews (
   id uuid PRIMARY KEY,
-  product_id varchar(120) NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-  owner_uid varchar(160) NOT NULL,
+  product_id varchar(120) NOT NULL DEFAULT '',
+  owner_uid varchar(160) NOT NULL DEFAULT '',
   user_name varchar(180) NOT NULL DEFAULT 'Verified customer',
-  rating numeric(2,1) NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  rating numeric(2,1) NOT NULL DEFAULT 5,
   comment varchar(1500) NOT NULL DEFAULT '',
   image_urls text NOT NULL DEFAULT '',
   verified_purchase boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT uk_reviews_owner_product UNIQUE (owner_uid, product_id)
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS product_id varchar(120) NOT NULL DEFAULT '';
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS owner_uid varchar(160) NOT NULL DEFAULT '';
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS user_name varchar(180) NOT NULL DEFAULT 'Verified customer';
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS rating numeric(2,1) NOT NULL DEFAULT 5;
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS comment varchar(1500) NOT NULL DEFAULT '';
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS image_urls text NOT NULL DEFAULT '';
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS verified_purchase boolean NOT NULL DEFAULT false;
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
 CREATE INDEX IF NOT EXISTS idx_reviews_product_created ON reviews(product_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS notifications (
   id uuid PRIMARY KEY,
-  owner_uid varchar(160) NOT NULL,
-  title varchar(220) NOT NULL,
-  body varchar(1000) NOT NULL,
+  owner_uid varchar(160) NOT NULL DEFAULT '',
+  title varchar(220) NOT NULL DEFAULT '',
+  body varchar(1000) NOT NULL DEFAULT '',
   notification_type varchar(60) NOT NULL DEFAULT 'general',
   image_url varchar(500) NOT NULL DEFAULT '',
   route varchar(300) NOT NULL DEFAULT '',
@@ -219,45 +259,84 @@ CREATE TABLE IF NOT EXISTS notifications (
   is_read boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS owner_uid varchar(160) NOT NULL DEFAULT '';
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS title varchar(220) NOT NULL DEFAULT '';
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS body varchar(1000) NOT NULL DEFAULT '';
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS notification_type varchar(60) NOT NULL DEFAULT 'general';
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS image_url varchar(500) NOT NULL DEFAULT '';
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS route varchar(300) NOT NULL DEFAULT '';
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS data_json text NOT NULL DEFAULT '{}';
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS is_read boolean NOT NULL DEFAULT false;
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+
 CREATE INDEX IF NOT EXISTS idx_notifications_owner_created ON notifications(owner_uid, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(owner_uid, is_read) WHERE NOT is_read;
 
 CREATE TABLE IF NOT EXISTS support_tickets (
   id uuid PRIMARY KEY,
-  owner_uid varchar(160) NOT NULL,
-  subject varchar(220) NOT NULL,
-  message varchar(2500) NOT NULL,
+  owner_uid varchar(160) NOT NULL DEFAULT '',
+  subject varchar(220) NOT NULL DEFAULT '',
+  message varchar(2500) NOT NULL DEFAULT '',
   category varchar(60) NOT NULL DEFAULT 'general',
   status varchar(40) NOT NULL DEFAULT 'open',
   priority varchar(40) NOT NULL DEFAULT 'normal',
   response varchar(2500) NOT NULL DEFAULT '',
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT chk_support_status CHECK (status IN ('open', 'in_progress', 'resolved', 'closed')),
-  CONSTRAINT chk_support_priority CHECK (priority IN ('low', 'normal', 'high', 'urgent'))
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS owner_uid varchar(160) NOT NULL DEFAULT '';
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS subject varchar(220) NOT NULL DEFAULT '';
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS message varchar(2500) NOT NULL DEFAULT '';
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS category varchar(60) NOT NULL DEFAULT 'general';
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS status varchar(40) NOT NULL DEFAULT 'open';
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS priority varchar(40) NOT NULL DEFAULT 'normal';
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS response varchar(2500) NOT NULL DEFAULT '';
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
 CREATE INDEX IF NOT EXISTS idx_support_owner_updated ON support_tickets(owner_uid, updated_at DESC);
 
 CREATE TABLE IF NOT EXISTS device_tokens (
   id bigserial PRIMARY KEY,
-  owner_uid varchar(160) NOT NULL,
-  token varchar(1000) NOT NULL UNIQUE,
+  owner_uid varchar(160) NOT NULL DEFAULT '',
+  token varchar(1000) NOT NULL DEFAULT '',
   platform varchar(30) NOT NULL DEFAULT 'unknown',
   device_name varchar(180) NOT NULL DEFAULT '',
   active boolean NOT NULL DEFAULT true,
   last_seen_at timestamptz NOT NULL DEFAULT now(),
   created_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE device_tokens ADD COLUMN IF NOT EXISTS owner_uid varchar(160) NOT NULL DEFAULT '';
+ALTER TABLE device_tokens ADD COLUMN IF NOT EXISTS token varchar(1000) NOT NULL DEFAULT '';
+ALTER TABLE device_tokens ADD COLUMN IF NOT EXISTS platform varchar(30) NOT NULL DEFAULT 'unknown';
+ALTER TABLE device_tokens ADD COLUMN IF NOT EXISTS device_name varchar(180) NOT NULL DEFAULT '';
+ALTER TABLE device_tokens ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true;
+ALTER TABLE device_tokens ADD COLUMN IF NOT EXISTS last_seen_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE device_tokens ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+
 CREATE INDEX IF NOT EXISTS idx_device_tokens_owner ON device_tokens(owner_uid, active);
 
 CREATE TABLE IF NOT EXISTS payment_events (
   id uuid PRIMARY KEY,
-  payment_id uuid REFERENCES payments(id) ON DELETE SET NULL,
-  owner_uid varchar(160) NOT NULL,
-  gateway varchar(80) NOT NULL,
-  gateway_event_id varchar(220) NOT NULL UNIQUE,
-  event_type varchar(100) NOT NULL,
+  payment_id uuid,
+  owner_uid varchar(160) NOT NULL DEFAULT '',
+  gateway varchar(80) NOT NULL DEFAULT '',
+  gateway_event_id varchar(220) NOT NULL DEFAULT '',
+  event_type varchar(100) NOT NULL DEFAULT '',
   signature_verified boolean NOT NULL DEFAULT false,
+  payload_json text NOT NULL DEFAULT '{}',
+  processed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE payment_events ADD COLUMN IF NOT EXISTS payment_id uuid;
+ALTER TABLE payment_events ADD COLUMN IF NOT EXISTS owner_uid varchar(160) NOT NULL DEFAULT '';
+ALTER TABLE payment_events ADD COLUMN IF NOT EXISTS gateway varchar(80) NOT NULL DEFAULT '';
+ALTER TABLE payment_events ADD COLUMN IF NOT EXISTS gateway_event_id varchar(220) NOT NULL DEFAULT '';
+ALTER TABLE payment_events ADD COLUMN IF NOT EXISTS event_type varchar(100) NOT NULL DEFAULT '';
+ALTER TABLE payment_events ADD COLUMN IF NOT EXISTS signature_verified boolean NOT NULL DEFAULT false;
+ALTER TABLE payment_events ADD COLUMN IF NOT EXISTS payload_json text NOT NULL DEFAULT '{}';
+ALTER TABLE payment_events ADD COLUMN IF NOT EXISTS processed_at timestamptz;
+ALTER TABLE payment_events ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
   payload_json text NOT NULL,
   processed_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now()
