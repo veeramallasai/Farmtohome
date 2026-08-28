@@ -1,19 +1,29 @@
--- V6__platform_modules.sql - End-to-End Idempotent Platform Modules Migration
+-- V6__platform_modules.sql - Complete, Fully Idempotent Platform Modules Migration with Universal Column Safeguards
 
--- STEP 1: Global Pre-Migration Column Reconciliation & Nullability Safeguard
+-- STEP 1: Global Pre-Migration Column Reconciliation & Universal Nullability Drop
 DO $$
 DECLARE
   tbl text;
-  col RECORD;
+  col text;
+  rec RECORD;
 BEGIN
   FOR tbl IN VALUES ('categories', 'banners', 'offers', 'farmers', 'delivery_slots', 'favorites', 'reviews', 'notifications', 'support_tickets', 'device_tokens', 'payment_events') LOOP
-    -- 1.1 Reconcile legacy is_active vs active
+    -- 1.1 Drop NOT NULL on all optional/legacy boolean/status/timestamp columns
+    FOR col IN VALUES ('is_active', 'active', 'is_available', 'available', 'is_deleted', 'deleted', 'is_read', 'verified', 'is_verified', 'verified_purchase', 'signature_verified', 'starts_at', 'ends_at', 'slot_date', 'processed_at', 'last_seen_at') LOOP
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = tbl AND column_name = col) THEN
+        BEGIN
+          EXECUTE format('ALTER TABLE %I ALTER COLUMN %I DROP NOT NULL', tbl, col);
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+      END IF;
+    END LOOP;
+
+    -- 1.2 Reconcile legacy is_active vs active
     IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = tbl AND column_name = 'is_active') THEN
       BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = tbl AND column_name = 'active') THEN
           EXECUTE format('ALTER TABLE %I RENAME COLUMN is_active TO active', tbl);
         ELSE
-          EXECUTE format('ALTER TABLE %I ALTER COLUMN is_active DROP NOT NULL', tbl);
           EXECUTE format('ALTER TABLE %I ALTER COLUMN is_active SET DEFAULT true', tbl);
           EXECUTE format('UPDATE %I SET is_active = active WHERE is_active IS NULL', tbl);
         END IF;
@@ -21,13 +31,12 @@ BEGIN
       END;
     END IF;
 
-    -- 1.2 Reconcile legacy is_available vs available
+    -- 1.3 Reconcile legacy is_available vs available
     IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = tbl AND column_name = 'is_available') THEN
       BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = tbl AND column_name = 'available') THEN
           EXECUTE format('ALTER TABLE %I RENAME COLUMN is_available TO available', tbl);
         ELSE
-          EXECUTE format('ALTER TABLE %I ALTER COLUMN is_available DROP NOT NULL', tbl);
           EXECUTE format('ALTER TABLE %I ALTER COLUMN is_available SET DEFAULT true', tbl);
           EXECUTE format('UPDATE %I SET is_available = available WHERE is_available IS NULL', tbl);
         END IF;
@@ -35,8 +44,8 @@ BEGIN
       END;
     END IF;
 
-    -- 1.3 Drop NOT NULL on any non-primary key column that lacks a default value
-    FOR col IN
+    -- 1.4 Drop NOT NULL on any non-primary key column that lacks a default value
+    FOR rec IN
       SELECT column_name
       FROM information_schema.columns
       WHERE table_name = tbl
@@ -46,7 +55,7 @@ BEGIN
         AND column_default IS NULL
     LOOP
       BEGIN
-        EXECUTE format('ALTER TABLE %I ALTER COLUMN %I DROP NOT NULL', tbl, col.column_name);
+        EXECUTE format('ALTER TABLE %I ALTER COLUMN %I DROP NOT NULL', tbl, rec.column_name);
       EXCEPTION WHEN OTHERS THEN NULL;
       END;
     END LOOP;
