@@ -43,7 +43,7 @@ public class PlatformService {
         SELECT c.id, c.name, c.description, c.image_url, c.icon_name,
                c.sort_order, c.active, c.created_at, c.updated_at,
                (SELECT count(*) FROM products p
-                WHERE p.active = true AND lower(p.category) = lower(c.id)) AS product_count
+                WHERE p.active = true AND (lower(p.category) = lower(c.id) OR lower(p.category) = lower(c.name))) AS product_count
         FROM categories c
         WHERE c.active = true
         ORDER BY c.sort_order, c.name

@@ -342,11 +342,11 @@ CREATE INDEX IF NOT EXISTS idx_payment_events_payment ON payment_events(payment_
 
 INSERT INTO categories (id, name, description, image_url, icon_name, sort_order)
 VALUES
-  ('vegetables', 'Vegetables', 'Farm-fresh vegetables selected every day', 'assets/images/categories/vegetables.png', 'eco', 0),
-  ('fruits', 'Fruits', 'Naturally fresh seasonal and everyday fruits', 'assets/images/categories/fruits.png', 'nutrition', 1),
-  ('dairy', 'Dairy', 'Fresh milk and trusted dairy essentials', 'assets/images/categories/dairy.png', 'local_drink', 2),
-  ('seasonal', 'Seasonal', 'Limited seasonal harvests picked for you', 'assets/images/categories/seasonal.png', 'calendar_month', 3)
-ON CONFLICT (id) DO NOTHING;
+  (gen_random_uuid()::text, 'Vegetables', 'Farm-fresh vegetables selected every day', 'assets/images/categories/vegetables.png', 'eco', 0),
+  (gen_random_uuid()::text, 'Fruits', 'Naturally fresh seasonal and everyday fruits', 'assets/images/categories/fruits.png', 'nutrition', 1),
+  (gen_random_uuid()::text, 'Dairy', 'Fresh milk and trusted dairy essentials', 'assets/images/categories/dairy.png', 'local_drink', 2),
+  (gen_random_uuid()::text, 'Seasonal', 'Limited seasonal harvests picked for you', 'assets/images/categories/seasonal.png', 'calendar_month', 3)
+ON CONFLICT DO NOTHING;
 
 INSERT INTO banners (id, title, subtitle, image_url, action_label, route, priority)
 VALUES
