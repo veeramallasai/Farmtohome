@@ -1,4 +1,57 @@
--- V6__platform_modules.sql - Complete, Fully Idempotent Platform Modules Migration with UUID Primary Keys & Legacy Column Safeguards
+-- V6__platform_modules.sql - End-to-End Idempotent Platform Modules Migration
+
+-- STEP 1: Global Pre-Migration Column Reconciliation & Nullability Safeguard
+DO $$
+DECLARE
+  tbl text;
+  col RECORD;
+BEGIN
+  FOR tbl IN VALUES ('categories', 'banners', 'offers', 'farmers', 'delivery_slots', 'favorites', 'reviews', 'notifications', 'support_tickets', 'device_tokens', 'payment_events') LOOP
+    -- 1.1 Reconcile legacy is_active vs active
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = tbl AND column_name = 'is_active') THEN
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = tbl AND column_name = 'active') THEN
+          EXECUTE format('ALTER TABLE %I RENAME COLUMN is_active TO active', tbl);
+        ELSE
+          EXECUTE format('ALTER TABLE %I ALTER COLUMN is_active DROP NOT NULL', tbl);
+          EXECUTE format('ALTER TABLE %I ALTER COLUMN is_active SET DEFAULT true', tbl);
+          EXECUTE format('UPDATE %I SET is_active = active WHERE is_active IS NULL', tbl);
+        END IF;
+      EXCEPTION WHEN OTHERS THEN NULL;
+      END;
+    END IF;
+
+    -- 1.2 Reconcile legacy is_available vs available
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = tbl AND column_name = 'is_available') THEN
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = tbl AND column_name = 'available') THEN
+          EXECUTE format('ALTER TABLE %I RENAME COLUMN is_available TO available', tbl);
+        ELSE
+          EXECUTE format('ALTER TABLE %I ALTER COLUMN is_available DROP NOT NULL', tbl);
+          EXECUTE format('ALTER TABLE %I ALTER COLUMN is_available SET DEFAULT true', tbl);
+          EXECUTE format('UPDATE %I SET is_available = available WHERE is_available IS NULL', tbl);
+        END IF;
+      EXCEPTION WHEN OTHERS THEN NULL;
+      END;
+    END IF;
+
+    -- 1.3 Drop NOT NULL on any non-primary key column that lacks a default value
+    FOR col IN
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = tbl
+        AND table_schema = current_schema()
+        AND is_nullable = 'NO'
+        AND column_name <> 'id'
+        AND column_default IS NULL
+    LOOP
+      BEGIN
+        EXECUTE format('ALTER TABLE %I ALTER COLUMN %I DROP NOT NULL', tbl, col.column_name);
+      EXCEPTION WHEN OTHERS THEN NULL;
+      END;
+    END LOOP;
+  END LOOP;
+END $$;
 
 -- 1. categories table
 CREATE TABLE IF NOT EXISTS categories (
@@ -28,18 +81,35 @@ BEGIN
       END
     );
   END IF;
-EXCEPTION WHEN OTHERS THEN NULL;
-END $$;
 
-ALTER TABLE categories ADD COLUMN IF NOT EXISTS name varchar(160) NOT NULL DEFAULT '';
-ALTER TABLE categories ADD COLUMN IF NOT EXISTS description varchar(500) NOT NULL DEFAULT '';
-ALTER TABLE categories ADD COLUMN IF NOT EXISTS image_url varchar(500) NOT NULL DEFAULT '';
-ALTER TABLE categories ADD COLUMN IF NOT EXISTS icon_name varchar(100) NOT NULL DEFAULT '';
-ALTER TABLE categories ADD COLUMN IF NOT EXISTS sort_order integer NOT NULL DEFAULT 0;
-ALTER TABLE categories ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true;
-ALTER TABLE categories ADD COLUMN IF NOT EXISTS deleted boolean NOT NULL DEFAULT false;
-ALTER TABLE categories ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
-ALTER TABLE categories ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'categories' AND column_name = 'name') THEN
+    ALTER TABLE categories ADD COLUMN name varchar(160) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'categories' AND column_name = 'description') THEN
+    ALTER TABLE categories ADD COLUMN description varchar(500) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'categories' AND column_name = 'image_url') THEN
+    ALTER TABLE categories ADD COLUMN image_url varchar(500) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'categories' AND column_name = 'icon_name') THEN
+    ALTER TABLE categories ADD COLUMN icon_name varchar(100) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'categories' AND column_name = 'sort_order') THEN
+    ALTER TABLE categories ADD COLUMN sort_order integer NOT NULL DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'categories' AND column_name = 'active') THEN
+    ALTER TABLE categories ADD COLUMN active boolean NOT NULL DEFAULT true;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'categories' AND column_name = 'deleted') THEN
+    ALTER TABLE categories ADD COLUMN deleted boolean NOT NULL DEFAULT false;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'categories' AND column_name = 'created_at') THEN
+    ALTER TABLE categories ADD COLUMN created_at timestamptz NOT NULL DEFAULT now();
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'categories' AND column_name = 'updated_at') THEN
+    ALTER TABLE categories ADD COLUMN updated_at timestamptz NOT NULL DEFAULT now();
+  END IF;
+END $$;
 
 UPDATE categories SET name = '' WHERE name IS NULL;
 UPDATE categories SET description = '' WHERE description IS NULL;
@@ -94,19 +164,38 @@ BEGIN
       END
     );
   END IF;
-EXCEPTION WHEN OTHERS THEN NULL;
-END $$;
 
-ALTER TABLE banners ADD COLUMN IF NOT EXISTS title varchar(200) NOT NULL DEFAULT '';
-ALTER TABLE banners ADD COLUMN IF NOT EXISTS subtitle varchar(500) NOT NULL DEFAULT '';
-ALTER TABLE banners ADD COLUMN IF NOT EXISTS image_url varchar(500) NOT NULL DEFAULT '';
-ALTER TABLE banners ADD COLUMN IF NOT EXISTS action_label varchar(100) NOT NULL DEFAULT '';
-ALTER TABLE banners ADD COLUMN IF NOT EXISTS route varchar(300) NOT NULL DEFAULT '';
-ALTER TABLE banners ADD COLUMN IF NOT EXISTS priority integer NOT NULL DEFAULT 0;
-ALTER TABLE banners ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true;
-ALTER TABLE banners ADD COLUMN IF NOT EXISTS deleted boolean NOT NULL DEFAULT false;
-ALTER TABLE banners ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
-ALTER TABLE banners ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'banners' AND column_name = 'title') THEN
+    ALTER TABLE banners ADD COLUMN title varchar(200) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'banners' AND column_name = 'subtitle') THEN
+    ALTER TABLE banners ADD COLUMN subtitle varchar(500) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'banners' AND column_name = 'image_url') THEN
+    ALTER TABLE banners ADD COLUMN image_url varchar(500) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'banners' AND column_name = 'action_label') THEN
+    ALTER TABLE banners ADD COLUMN action_label varchar(100) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'banners' AND column_name = 'route') THEN
+    ALTER TABLE banners ADD COLUMN route varchar(300) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'banners' AND column_name = 'priority') THEN
+    ALTER TABLE banners ADD COLUMN priority integer NOT NULL DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'banners' AND column_name = 'active') THEN
+    ALTER TABLE banners ADD COLUMN active boolean NOT NULL DEFAULT true;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'banners' AND column_name = 'deleted') THEN
+    ALTER TABLE banners ADD COLUMN deleted boolean NOT NULL DEFAULT false;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'banners' AND column_name = 'created_at') THEN
+    ALTER TABLE banners ADD COLUMN created_at timestamptz NOT NULL DEFAULT now();
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'banners' AND column_name = 'updated_at') THEN
+    ALTER TABLE banners ADD COLUMN updated_at timestamptz NOT NULL DEFAULT now();
+  END IF;
+END $$;
 
 UPDATE banners SET active = true WHERE active IS NULL;
 UPDATE banners SET deleted = false WHERE deleted IS NULL;
@@ -155,20 +244,41 @@ BEGIN
       END
     );
   END IF;
-EXCEPTION WHEN OTHERS THEN NULL;
-END $$;
 
-ALTER TABLE offers ADD COLUMN IF NOT EXISTS title varchar(200) NOT NULL DEFAULT '';
-ALTER TABLE offers ADD COLUMN IF NOT EXISTS description varchar(500) NOT NULL DEFAULT '';
-ALTER TABLE offers ADD COLUMN IF NOT EXISTS discount_type varchar(30) NOT NULL DEFAULT 'percentage';
-ALTER TABLE offers ADD COLUMN IF NOT EXISTS discount_value numeric(12,2) NOT NULL DEFAULT 0;
-ALTER TABLE offers ADD COLUMN IF NOT EXISTS minimum_order numeric(12,2) NOT NULL DEFAULT 0;
-ALTER TABLE offers ADD COLUMN IF NOT EXISTS maximum_discount numeric(12,2) NOT NULL DEFAULT 0;
-ALTER TABLE offers ADD COLUMN IF NOT EXISTS image_url varchar(500) NOT NULL DEFAULT '';
-ALTER TABLE offers ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true;
-ALTER TABLE offers ADD COLUMN IF NOT EXISTS deleted boolean NOT NULL DEFAULT false;
-ALTER TABLE offers ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
-ALTER TABLE offers ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'title') THEN
+    ALTER TABLE offers ADD COLUMN title varchar(200) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'description') THEN
+    ALTER TABLE offers ADD COLUMN description varchar(500) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'discount_type') THEN
+    ALTER TABLE offers ADD COLUMN discount_type varchar(30) NOT NULL DEFAULT 'percentage';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'discount_value') THEN
+    ALTER TABLE offers ADD COLUMN discount_value numeric(12,2) NOT NULL DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'minimum_order') THEN
+    ALTER TABLE offers ADD COLUMN minimum_order numeric(12,2) NOT NULL DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'maximum_discount') THEN
+    ALTER TABLE offers ADD COLUMN maximum_discount numeric(12,2) NOT NULL DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'image_url') THEN
+    ALTER TABLE offers ADD COLUMN image_url varchar(500) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'active') THEN
+    ALTER TABLE offers ADD COLUMN active boolean NOT NULL DEFAULT true;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'deleted') THEN
+    ALTER TABLE offers ADD COLUMN deleted boolean NOT NULL DEFAULT false;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'created_at') THEN
+    ALTER TABLE offers ADD COLUMN created_at timestamptz NOT NULL DEFAULT now();
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'updated_at') THEN
+    ALTER TABLE offers ADD COLUMN updated_at timestamptz NOT NULL DEFAULT now();
+  END IF;
+END $$;
 
 UPDATE offers SET active = true WHERE active IS NULL;
 UPDATE offers SET deleted = false WHERE deleted IS NULL;
@@ -217,22 +327,47 @@ BEGIN
       END
     );
   END IF;
-EXCEPTION WHEN OTHERS THEN NULL;
-END $$;
 
-ALTER TABLE farmers ADD COLUMN IF NOT EXISTS name varchar(180) NOT NULL DEFAULT '';
-ALTER TABLE farmers ADD COLUMN IF NOT EXISTS farm_name varchar(220) NOT NULL DEFAULT '';
-ALTER TABLE farmers ADD COLUMN IF NOT EXISTS location varchar(250) NOT NULL DEFAULT '';
-ALTER TABLE farmers ADD COLUMN IF NOT EXISTS image_url varchar(500) NOT NULL DEFAULT '';
-ALTER TABLE farmers ADD COLUMN IF NOT EXISTS rating numeric(3,2) NOT NULL DEFAULT 0;
-ALTER TABLE farmers ADD COLUMN IF NOT EXISTS review_count integer NOT NULL DEFAULT 0;
-ALTER TABLE farmers ADD COLUMN IF NOT EXISTS verified boolean NOT NULL DEFAULT false;
-ALTER TABLE farmers ADD COLUMN IF NOT EXISTS experience_years integer NOT NULL DEFAULT 0;
-ALTER TABLE farmers ADD COLUMN IF NOT EXISTS speciality varchar(250) NOT NULL DEFAULT '';
-ALTER TABLE farmers ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true;
-ALTER TABLE farmers ADD COLUMN IF NOT EXISTS deleted boolean NOT NULL DEFAULT false;
-ALTER TABLE farmers ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
-ALTER TABLE farmers ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'farmers' AND column_name = 'name') THEN
+    ALTER TABLE farmers ADD COLUMN name varchar(180) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'farmers' AND column_name = 'farm_name') THEN
+    ALTER TABLE farmers ADD COLUMN farm_name varchar(220) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'farmers' AND column_name = 'location') THEN
+    ALTER TABLE farmers ADD COLUMN location varchar(250) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'farmers' AND column_name = 'image_url') THEN
+    ALTER TABLE farmers ADD COLUMN image_url varchar(500) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'farmers' AND column_name = 'rating') THEN
+    ALTER TABLE farmers ADD COLUMN rating numeric(3,2) NOT NULL DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'farmers' AND column_name = 'review_count') THEN
+    ALTER TABLE farmers ADD COLUMN review_count integer NOT NULL DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'farmers' AND column_name = 'verified') THEN
+    ALTER TABLE farmers ADD COLUMN verified boolean NOT NULL DEFAULT false;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'farmers' AND column_name = 'experience_years') THEN
+    ALTER TABLE farmers ADD COLUMN experience_years integer NOT NULL DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'farmers' AND column_name = 'speciality') THEN
+    ALTER TABLE farmers ADD COLUMN speciality varchar(250) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'farmers' AND column_name = 'active') THEN
+    ALTER TABLE farmers ADD COLUMN active boolean NOT NULL DEFAULT true;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'farmers' AND column_name = 'deleted') THEN
+    ALTER TABLE farmers ADD COLUMN deleted boolean NOT NULL DEFAULT false;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'farmers' AND column_name = 'created_at') THEN
+    ALTER TABLE farmers ADD COLUMN created_at timestamptz NOT NULL DEFAULT now();
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'farmers' AND column_name = 'updated_at') THEN
+    ALTER TABLE farmers ADD COLUMN updated_at timestamptz NOT NULL DEFAULT now();
+  END IF;
+END $$;
 
 UPDATE farmers SET active = true WHERE active IS NULL;
 UPDATE farmers SET deleted = false WHERE deleted IS NULL;
@@ -280,20 +415,41 @@ BEGIN
       END
     );
   END IF;
-EXCEPTION WHEN OTHERS THEN NULL;
-END $$;
 
-ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS method varchar(40) NOT NULL DEFAULT 'standard';
-ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS label varchar(160) NOT NULL DEFAULT '';
-ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS start_time time NOT NULL DEFAULT '08:00:00';
-ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS end_time time NOT NULL DEFAULT '20:00:00';
-ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS fee numeric(12,2) NOT NULL DEFAULT 0;
-ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS available boolean NOT NULL DEFAULT true;
-ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS capacity integer NOT NULL DEFAULT 0;
-ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS booked_count integer NOT NULL DEFAULT 0;
-ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS slot_date date;
-ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
-ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_slots' AND column_name = 'method') THEN
+    ALTER TABLE delivery_slots ADD COLUMN method varchar(40) NOT NULL DEFAULT 'standard';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_slots' AND column_name = 'label') THEN
+    ALTER TABLE delivery_slots ADD COLUMN label varchar(160) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_slots' AND column_name = 'start_time') THEN
+    ALTER TABLE delivery_slots ADD COLUMN start_time time NOT NULL DEFAULT '08:00:00';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_slots' AND column_name = 'end_time') THEN
+    ALTER TABLE delivery_slots ADD COLUMN end_time time NOT NULL DEFAULT '20:00:00';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_slots' AND column_name = 'fee') THEN
+    ALTER TABLE delivery_slots ADD COLUMN fee numeric(12,2) NOT NULL DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_slots' AND column_name = 'available') THEN
+    ALTER TABLE delivery_slots ADD COLUMN available boolean NOT NULL DEFAULT true;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_slots' AND column_name = 'capacity') THEN
+    ALTER TABLE delivery_slots ADD COLUMN capacity integer NOT NULL DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_slots' AND column_name = 'booked_count') THEN
+    ALTER TABLE delivery_slots ADD COLUMN booked_count integer NOT NULL DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_slots' AND column_name = 'slot_date') THEN
+    ALTER TABLE delivery_slots ADD COLUMN slot_date date;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_slots' AND column_name = 'created_at') THEN
+    ALTER TABLE delivery_slots ADD COLUMN created_at timestamptz NOT NULL DEFAULT now();
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_slots' AND column_name = 'updated_at') THEN
+    ALTER TABLE delivery_slots ADD COLUMN updated_at timestamptz NOT NULL DEFAULT now();
+  END IF;
+END $$;
 
 UPDATE delivery_slots SET available = true WHERE available IS NULL;
 UPDATE delivery_slots SET fee = 0 WHERE fee IS NULL;
@@ -393,9 +549,18 @@ CREATE TABLE IF NOT EXISTS favorites (
   product_id varchar(120) NOT NULL DEFAULT '',
   created_at timestamptz NOT NULL DEFAULT now()
 );
-ALTER TABLE favorites ADD COLUMN IF NOT EXISTS owner_uid varchar(160) NOT NULL DEFAULT '';
-ALTER TABLE favorites ADD COLUMN IF NOT EXISTS product_id varchar(120) NOT NULL DEFAULT '';
-ALTER TABLE favorites ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'favorites' AND column_name = 'owner_uid') THEN
+    ALTER TABLE favorites ADD COLUMN owner_uid varchar(160) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'favorites' AND column_name = 'product_id') THEN
+    ALTER TABLE favorites ADD COLUMN product_id varchar(120) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'favorites' AND column_name = 'created_at') THEN
+    ALTER TABLE favorites ADD COLUMN created_at timestamptz NOT NULL DEFAULT now();
+  END IF;
+END $$;
 
 UPDATE favorites SET created_at = now() WHERE created_at IS NULL;
 ALTER TABLE favorites ALTER COLUMN created_at SET DEFAULT now();
@@ -415,15 +580,36 @@ CREATE TABLE IF NOT EXISTS reviews (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
-ALTER TABLE reviews ADD COLUMN IF NOT EXISTS product_id varchar(120) NOT NULL DEFAULT '';
-ALTER TABLE reviews ADD COLUMN IF NOT EXISTS owner_uid varchar(160) NOT NULL DEFAULT '';
-ALTER TABLE reviews ADD COLUMN IF NOT EXISTS user_name varchar(180) NOT NULL DEFAULT 'Verified customer';
-ALTER TABLE reviews ADD COLUMN IF NOT EXISTS rating numeric(2,1) NOT NULL DEFAULT 5;
-ALTER TABLE reviews ADD COLUMN IF NOT EXISTS comment varchar(1500) NOT NULL DEFAULT '';
-ALTER TABLE reviews ADD COLUMN IF NOT EXISTS image_urls text NOT NULL DEFAULT '';
-ALTER TABLE reviews ADD COLUMN IF NOT EXISTS verified_purchase boolean NOT NULL DEFAULT false;
-ALTER TABLE reviews ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
-ALTER TABLE reviews ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'reviews' AND column_name = 'product_id') THEN
+    ALTER TABLE reviews ADD COLUMN product_id varchar(120) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'reviews' AND column_name = 'owner_uid') THEN
+    ALTER TABLE reviews ADD COLUMN owner_uid varchar(160) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'reviews' AND column_name = 'user_name') THEN
+    ALTER TABLE reviews ADD COLUMN user_name varchar(180) NOT NULL DEFAULT 'Verified customer';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'reviews' AND column_name = 'rating') THEN
+    ALTER TABLE reviews ADD COLUMN rating numeric(2,1) NOT NULL DEFAULT 5;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'reviews' AND column_name = 'comment') THEN
+    ALTER TABLE reviews ADD COLUMN comment varchar(1500) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'reviews' AND column_name = 'image_urls') THEN
+    ALTER TABLE reviews ADD COLUMN image_urls text NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'reviews' AND column_name = 'verified_purchase') THEN
+    ALTER TABLE reviews ADD COLUMN verified_purchase boolean NOT NULL DEFAULT false;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'reviews' AND column_name = 'created_at') THEN
+    ALTER TABLE reviews ADD COLUMN created_at timestamptz NOT NULL DEFAULT now();
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'reviews' AND column_name = 'updated_at') THEN
+    ALTER TABLE reviews ADD COLUMN updated_at timestamptz NOT NULL DEFAULT now();
+  END IF;
+END $$;
 
 UPDATE reviews SET verified_purchase = false WHERE verified_purchase IS NULL;
 UPDATE reviews SET rating = 5 WHERE rating IS NULL;
@@ -450,15 +636,36 @@ CREATE TABLE IF NOT EXISTS notifications (
   is_read boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now()
 );
-ALTER TABLE notifications ADD COLUMN IF NOT EXISTS owner_uid varchar(160) NOT NULL DEFAULT '';
-ALTER TABLE notifications ADD COLUMN IF NOT EXISTS title varchar(220) NOT NULL DEFAULT '';
-ALTER TABLE notifications ADD COLUMN IF NOT EXISTS body varchar(1000) NOT NULL DEFAULT '';
-ALTER TABLE notifications ADD COLUMN IF NOT EXISTS notification_type varchar(60) NOT NULL DEFAULT 'general';
-ALTER TABLE notifications ADD COLUMN IF NOT EXISTS image_url varchar(500) NOT NULL DEFAULT '';
-ALTER TABLE notifications ADD COLUMN IF NOT EXISTS route varchar(300) NOT NULL DEFAULT '';
-ALTER TABLE notifications ADD COLUMN IF NOT EXISTS data_json text NOT NULL DEFAULT '{}';
-ALTER TABLE notifications ADD COLUMN IF NOT EXISTS is_read boolean NOT NULL DEFAULT false;
-ALTER TABLE notifications ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notifications' AND column_name = 'owner_uid') THEN
+    ALTER TABLE notifications ADD COLUMN owner_uid varchar(160) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notifications' AND column_name = 'title') THEN
+    ALTER TABLE notifications ADD COLUMN title varchar(220) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notifications' AND column_name = 'body') THEN
+    ALTER TABLE notifications ADD COLUMN body varchar(1000) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notifications' AND column_name = 'notification_type') THEN
+    ALTER TABLE notifications ADD COLUMN notification_type varchar(60) NOT NULL DEFAULT 'general';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notifications' AND column_name = 'image_url') THEN
+    ALTER TABLE notifications ADD COLUMN image_url varchar(500) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notifications' AND column_name = 'route') THEN
+    ALTER TABLE notifications ADD COLUMN route varchar(300) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notifications' AND column_name = 'data_json') THEN
+    ALTER TABLE notifications ADD COLUMN data_json text NOT NULL DEFAULT '{}';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notifications' AND column_name = 'is_read') THEN
+    ALTER TABLE notifications ADD COLUMN is_read boolean NOT NULL DEFAULT false;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notifications' AND column_name = 'created_at') THEN
+    ALTER TABLE notifications ADD COLUMN created_at timestamptz NOT NULL DEFAULT now();
+  END IF;
+END $$;
 
 UPDATE notifications SET is_read = false WHERE is_read IS NULL;
 UPDATE notifications SET created_at = now() WHERE created_at IS NULL;
@@ -482,15 +689,36 @@ CREATE TABLE IF NOT EXISTS support_tickets (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
-ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS owner_uid varchar(160) NOT NULL DEFAULT '';
-ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS subject varchar(220) NOT NULL DEFAULT '';
-ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS message varchar(2500) NOT NULL DEFAULT '';
-ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS category varchar(60) NOT NULL DEFAULT 'general';
-ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS status varchar(40) NOT NULL DEFAULT 'open';
-ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS priority varchar(40) NOT NULL DEFAULT 'normal';
-ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS response varchar(2500) NOT NULL DEFAULT '';
-ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
-ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'support_tickets' AND column_name = 'owner_uid') THEN
+    ALTER TABLE support_tickets ADD COLUMN owner_uid varchar(160) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'support_tickets' AND column_name = 'subject') THEN
+    ALTER TABLE support_tickets ADD COLUMN subject varchar(220) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'support_tickets' AND column_name = 'message') THEN
+    ALTER TABLE support_tickets ADD COLUMN message varchar(2500) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'support_tickets' AND column_name = 'category') THEN
+    ALTER TABLE support_tickets ADD COLUMN category varchar(60) NOT NULL DEFAULT 'general';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'support_tickets' AND column_name = 'status') THEN
+    ALTER TABLE support_tickets ADD COLUMN status varchar(40) NOT NULL DEFAULT 'open';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'support_tickets' AND column_name = 'priority') THEN
+    ALTER TABLE support_tickets ADD COLUMN priority varchar(40) NOT NULL DEFAULT 'normal';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'support_tickets' AND column_name = 'response') THEN
+    ALTER TABLE support_tickets ADD COLUMN response varchar(2500) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'support_tickets' AND column_name = 'created_at') THEN
+    ALTER TABLE support_tickets ADD COLUMN created_at timestamptz NOT NULL DEFAULT now();
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'support_tickets' AND column_name = 'updated_at') THEN
+    ALTER TABLE support_tickets ADD COLUMN updated_at timestamptz NOT NULL DEFAULT now();
+  END IF;
+END $$;
 
 UPDATE support_tickets SET status = 'open' WHERE status IS NULL;
 UPDATE support_tickets SET priority = 'normal' WHERE priority IS NULL;
@@ -515,13 +743,30 @@ CREATE TABLE IF NOT EXISTS device_tokens (
   last_seen_at timestamptz NOT NULL DEFAULT now(),
   created_at timestamptz NOT NULL DEFAULT now()
 );
-ALTER TABLE device_tokens ADD COLUMN IF NOT EXISTS owner_uid varchar(160) NOT NULL DEFAULT '';
-ALTER TABLE device_tokens ADD COLUMN IF NOT EXISTS token varchar(1000) NOT NULL DEFAULT '';
-ALTER TABLE device_tokens ADD COLUMN IF NOT EXISTS platform varchar(30) NOT NULL DEFAULT 'unknown';
-ALTER TABLE device_tokens ADD COLUMN IF NOT EXISTS device_name varchar(180) NOT NULL DEFAULT '';
-ALTER TABLE device_tokens ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true;
-ALTER TABLE device_tokens ADD COLUMN IF NOT EXISTS last_seen_at timestamptz NOT NULL DEFAULT now();
-ALTER TABLE device_tokens ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'device_tokens' AND column_name = 'owner_uid') THEN
+    ALTER TABLE device_tokens ADD COLUMN owner_uid varchar(160) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'device_tokens' AND column_name = 'token') THEN
+    ALTER TABLE device_tokens ADD COLUMN token varchar(1000) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'device_tokens' AND column_name = 'platform') THEN
+    ALTER TABLE device_tokens ADD COLUMN platform varchar(30) NOT NULL DEFAULT 'unknown';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'device_tokens' AND column_name = 'device_name') THEN
+    ALTER TABLE device_tokens ADD COLUMN device_name varchar(180) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'device_tokens' AND column_name = 'active') THEN
+    ALTER TABLE device_tokens ADD COLUMN active boolean NOT NULL DEFAULT true;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'device_tokens' AND column_name = 'last_seen_at') THEN
+    ALTER TABLE device_tokens ADD COLUMN last_seen_at timestamptz NOT NULL DEFAULT now();
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'device_tokens' AND column_name = 'created_at') THEN
+    ALTER TABLE device_tokens ADD COLUMN created_at timestamptz NOT NULL DEFAULT now();
+  END IF;
+END $$;
 
 UPDATE device_tokens SET active = true WHERE active IS NULL;
 UPDATE device_tokens SET last_seen_at = now() WHERE last_seen_at IS NULL;
@@ -546,15 +791,36 @@ CREATE TABLE IF NOT EXISTS payment_events (
   processed_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now()
 );
-ALTER TABLE payment_events ADD COLUMN IF NOT EXISTS payment_id uuid;
-ALTER TABLE payment_events ADD COLUMN IF NOT EXISTS owner_uid varchar(160) NOT NULL DEFAULT '';
-ALTER TABLE payment_events ADD COLUMN IF NOT EXISTS gateway varchar(80) NOT NULL DEFAULT '';
-ALTER TABLE payment_events ADD COLUMN IF NOT EXISTS gateway_event_id varchar(220) NOT NULL DEFAULT '';
-ALTER TABLE payment_events ADD COLUMN IF NOT EXISTS event_type varchar(100) NOT NULL DEFAULT '';
-ALTER TABLE payment_events ADD COLUMN IF NOT EXISTS signature_verified boolean NOT NULL DEFAULT false;
-ALTER TABLE payment_events ADD COLUMN IF NOT EXISTS payload_json text NOT NULL DEFAULT '{}';
-ALTER TABLE payment_events ADD COLUMN IF NOT EXISTS processed_at timestamptz;
-ALTER TABLE payment_events ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'payment_events' AND column_name = 'payment_id') THEN
+    ALTER TABLE payment_events ADD COLUMN payment_id uuid;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'payment_events' AND column_name = 'owner_uid') THEN
+    ALTER TABLE payment_events ADD COLUMN owner_uid varchar(160) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'payment_events' AND column_name = 'gateway') THEN
+    ALTER TABLE payment_events ADD COLUMN gateway varchar(80) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'payment_events' AND column_name = 'gateway_event_id') THEN
+    ALTER TABLE payment_events ADD COLUMN gateway_event_id varchar(220) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'payment_events' AND column_name = 'event_type') THEN
+    ALTER TABLE payment_events ADD COLUMN event_type varchar(100) NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'payment_events' AND column_name = 'signature_verified') THEN
+    ALTER TABLE payment_events ADD COLUMN signature_verified boolean NOT NULL DEFAULT false;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'payment_events' AND column_name = 'payload_json') THEN
+    ALTER TABLE payment_events ADD COLUMN payload_json text NOT NULL DEFAULT '{}';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'payment_events' AND column_name = 'processed_at') THEN
+    ALTER TABLE payment_events ADD COLUMN processed_at timestamptz;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'payment_events' AND column_name = 'created_at') THEN
+    ALTER TABLE payment_events ADD COLUMN created_at timestamptz NOT NULL DEFAULT now();
+  END IF;
+END $$;
 
 UPDATE payment_events SET signature_verified = false WHERE signature_verified IS NULL;
 UPDATE payment_events SET created_at = now() WHERE created_at IS NULL;
@@ -564,56 +830,7 @@ ALTER TABLE payment_events ALTER COLUMN created_at SET DEFAULT now();
 
 CREATE INDEX IF NOT EXISTS idx_payment_events_payment ON payment_events(payment_id, created_at DESC);
 
--- 14. Global Safeguard for Pre-existing NOT NULL / Legacy Columns
-DO $$
-DECLARE
-  tbl text;
-  col RECORD;
-BEGIN
-  FOR tbl IN VALUES ('categories', 'banners', 'offers', 'farmers', 'delivery_slots', 'favorites', 'reviews', 'notifications', 'support_tickets', 'device_tokens', 'payment_events') LOOP
-    -- Drop NOT NULL and set DEFAULT for is_active if it exists on pre-existing Railway table
-    IF EXISTS (
-      SELECT 1 FROM information_schema.columns WHERE table_name = tbl AND column_name = 'is_active'
-    ) THEN
-      BEGIN
-        EXECUTE format('UPDATE %I SET is_active = true WHERE is_active IS NULL', tbl);
-        EXECUTE format('ALTER TABLE %I ALTER COLUMN is_active SET DEFAULT true', tbl);
-        EXECUTE format('ALTER TABLE %I ALTER COLUMN is_active DROP NOT NULL', tbl);
-      EXCEPTION WHEN OTHERS THEN NULL;
-      END;
-    END IF;
-
-    -- Drop NOT NULL and set DEFAULT for is_available if it exists on pre-existing Railway table
-    IF EXISTS (
-      SELECT 1 FROM information_schema.columns WHERE table_name = tbl AND column_name = 'is_available'
-    ) THEN
-      BEGIN
-        EXECUTE format('UPDATE %I SET is_available = true WHERE is_available IS NULL', tbl);
-        EXECUTE format('ALTER TABLE %I ALTER COLUMN is_available SET DEFAULT true', tbl);
-        EXECUTE format('ALTER TABLE %I ALTER COLUMN is_available DROP NOT NULL', tbl);
-      EXCEPTION WHEN OTHERS THEN NULL;
-      END;
-    END IF;
-
-    -- For any non-primary key column on tbl that is NOT NULL and lacks a default value, drop NOT NULL constraint
-    FOR col IN
-      SELECT column_name
-      FROM information_schema.columns
-      WHERE table_name = tbl
-        AND table_schema = current_schema()
-        AND is_nullable = 'NO'
-        AND column_name <> 'id'
-        AND column_default IS NULL
-    LOOP
-      BEGIN
-        EXECUTE format('ALTER TABLE %I ALTER COLUMN %I DROP NOT NULL', tbl, col.column_name);
-      EXCEPTION WHEN OTHERS THEN NULL;
-      END;
-    END LOOP;
-  END LOOP;
-END $$;
-
--- 15. Seed Data (Fully Idempotent with UUID PKs and business key existence guards)
+-- 14. Seed Data (Fully Idempotent with UUID PKs and business key existence guards)
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Vegetables') THEN
