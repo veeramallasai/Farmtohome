@@ -22,27 +22,32 @@ CREATE TABLE IF NOT EXISTS products (
 );
 
 DO $$
+DECLARE
+  r RECORD;
 BEGIN
-  BEGIN
-    ALTER TABLE favorites DROP CONSTRAINT IF EXISTS favorites_product_id_fkey;
-  EXCEPTION WHEN OTHERS THEN NULL;
-  END;
+  -- 1. Dynamically drop any active foreign key constraints on tables referencing products or product_id
+  FOR r IN (
+    SELECT tc.table_name, tc.constraint_name
+    FROM information_schema.table_constraints tc
+    JOIN information_schema.key_column_usage kcu
+      ON tc.constraint_name = kcu.constraint_name
+      AND tc.table_schema = kcu.table_schema
+    WHERE tc.constraint_type = 'FOREIGN KEY'
+      AND (kcu.column_name = 'product_id' OR kcu.column_name = 'id')
+  ) LOOP
+    BEGIN
+      EXECUTE format('ALTER TABLE %I DROP CONSTRAINT IF EXISTS %I CASCADE', r.table_name, r.constraint_name);
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+  END LOOP;
 
-  BEGIN
-    ALTER TABLE reviews DROP CONSTRAINT IF EXISTS reviews_product_id_fkey;
-  EXCEPTION WHEN OTHERS THEN NULL;
-  END;
+  -- Explicit fallback drops for known constraints
+  BEGIN ALTER TABLE favorites DROP CONSTRAINT IF EXISTS favorites_product_id_fkey CASCADE; EXCEPTION WHEN OTHERS THEN NULL; END;
+  BEGIN ALTER TABLE reviews DROP CONSTRAINT IF EXISTS reviews_product_id_fkey CASCADE; EXCEPTION WHEN OTHERS THEN NULL; END;
+  BEGIN ALTER TABLE cart_items DROP CONSTRAINT IF EXISTS cart_items_product_id_fkey CASCADE; EXCEPTION WHEN OTHERS THEN NULL; END;
+  BEGIN ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_product_id_fkey CASCADE; EXCEPTION WHEN OTHERS THEN NULL; END;
 
-  BEGIN
-    ALTER TABLE cart_items DROP CONSTRAINT IF EXISTS cart_items_product_id_fkey;
-  EXCEPTION WHEN OTHERS THEN NULL;
-  END;
-
-  BEGIN
-    ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_product_id_fkey;
-  EXCEPTION WHEN OTHERS THEN NULL;
-  END;
-
+  -- 2. Convert products.id to VARCHAR(120)
   IF EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_name = 'products'
@@ -52,6 +57,7 @@ BEGIN
     ALTER TABLE products ALTER COLUMN id TYPE varchar(120) USING id::text;
   END IF;
 
+  -- 3. Convert cart_items.product_id to VARCHAR(120)
   IF EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_name = 'cart_items'
@@ -61,6 +67,7 @@ BEGIN
     ALTER TABLE cart_items ALTER COLUMN product_id TYPE varchar(120) USING product_id::text;
   END IF;
 
+  -- 4. Convert order_items.product_id to VARCHAR(120)
   IF EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_name = 'order_items'
@@ -70,6 +77,7 @@ BEGIN
     ALTER TABLE order_items ALTER COLUMN product_id TYPE varchar(120) USING product_id::text;
   END IF;
 
+  -- 5. Convert favorites.product_id to VARCHAR(120)
   IF EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_name = 'favorites'
@@ -79,6 +87,7 @@ BEGIN
     ALTER TABLE favorites ALTER COLUMN product_id TYPE varchar(120) USING product_id::text;
   END IF;
 
+  -- 6. Convert reviews.product_id to VARCHAR(120)
   IF EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_name = 'reviews'
