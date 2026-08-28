@@ -7,5 +7,4 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 COPY --from=builder /app/target/*.jar /app/app.jar
-EXPOSE 8085
-CMD ["java", "-jar", "-Dserver.port=${PORT:-8085}", "/app/app.jar"]
+CMD ["sh", "-c", "java -jar /app/app.jar"]
