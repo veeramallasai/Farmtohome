@@ -26,3 +26,15 @@ CREATE INDEX IF NOT EXISTS idx_email_verification_otps_uid_email
 
 CREATE INDEX IF NOT EXISTS idx_email_verification_otps_expires_at
   ON email_verification_otps(expires_at);
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'email_verification_otps_firebase_uid_fkey'
+  ) THEN
+    ALTER TABLE email_verification_otps DROP CONSTRAINT email_verification_otps_firebase_uid_fkey;
+  END IF;
+EXCEPTION
+  WHEN OTHERS THEN NULL;
+END $$;

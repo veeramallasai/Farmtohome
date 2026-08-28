@@ -1,6 +1,6 @@
 package com.farmtohome.api.config;
 
-import com.farmtohome.api.auth.FirebaseTokenFilter;
+import com.farmtohome.api.auth.JwtAuthFilter;
 import java.util.Arrays;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,7 +28,7 @@ public class SecurityConfig {
   @Bean
   SecurityFilterChain securityFilterChain(
       HttpSecurity http,
-      FirebaseTokenFilter firebaseTokenFilter) throws Exception {
+      JwtAuthFilter jwtAuthFilter) throws Exception {
     return http
         .csrf(csrf -> csrf.disable())
         .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -56,7 +56,7 @@ public class SecurityConfig {
                   "{\"success\":false,\"message\":\"Access denied.\","
                       + "\"code\":\"FORBIDDEN\"}");
             }))
-        .addFilterBefore(firebaseTokenFilter, UsernamePasswordAuthenticationFilter.class)
+        .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
         .build();
   }
 
