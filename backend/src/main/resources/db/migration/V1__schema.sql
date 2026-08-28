@@ -23,14 +23,29 @@ CREATE TABLE IF NOT EXISTS products (
 
 DO $$
 BEGIN
+  BEGIN
+    ALTER TABLE favorites DROP CONSTRAINT IF EXISTS favorites_product_id_fkey;
+  EXCEPTION WHEN OTHERS THEN NULL;
+  END;
+
+  BEGIN
+    ALTER TABLE cart_items DROP CONSTRAINT IF EXISTS cart_items_product_id_fkey;
+  EXCEPTION WHEN OTHERS THEN NULL;
+  END;
+
+  BEGIN
+    ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_product_id_fkey;
+  EXCEPTION WHEN OTHERS THEN NULL;
+  END;
+
   IF EXISTS (
     SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'products' AND column_name = 'id' AND udt_name = 'uuid'
+    WHERE table_name = 'products'
+      AND column_name = 'id'
+      AND data_type NOT IN ('character varying', 'text', 'varchar')
   ) THEN
     ALTER TABLE products ALTER COLUMN id TYPE varchar(120) USING id::text;
   END IF;
-EXCEPTION
-  WHEN OTHERS THEN NULL;
 END $$;
 
 ALTER TABLE products ADD COLUMN IF NOT EXISTS name varchar(255) NOT NULL DEFAULT '';
