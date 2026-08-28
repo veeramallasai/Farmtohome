@@ -107,63 +107,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
   }
 
-  Future<void> _applyCoupon() async {
-    final String code = _couponController.text.trim().toUpperCase();
 
-    if (code.isEmpty) {
-      _showMessage('Enter a coupon code.', error: true);
-      return;
-    }
-
-    if (_applyingCoupon) {
-      return;
-    }
-
-    setState(() {
-      _applyingCoupon = true;
-    });
-
-    try {
-      await _cartRepository.applyCoupon(code, 0);
-      final CartModel cart = await _cartRepository.getCart();
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _couponCode = code;
-        _couponDiscount = cart.couponDiscount;
-        _cartFuture = Future<CartModel>.value(cart);
-      });
-
-      _showMessage('Coupon $code applied successfully.');
-    } catch (_) {
-      _showMessage('Unable to apply coupon.', error: true);
-    } finally {
-      if (mounted) {
-        setState(() {
-          _applyingCoupon = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _removeCoupon() async {
-    try {
-      await _cartRepository.removeCoupon();
-      final CartModel cart = await _cartRepository.getCart();
-      if (!mounted) return;
-      setState(() {
-        _couponCode = null;
-        _couponDiscount = 0;
-        _couponController.clear();
-        _cartFuture = Future<CartModel>.value(cart);
-      });
-    } catch (_) {
-      _showMessage('Unable to remove coupon.', error: true);
-    }
-  }
 
   void _continueToPayment(List<_CheckoutCartItem> items) {
     if (_continuing) {
@@ -1501,7 +1445,7 @@ class _CheckoutTotals {
 
   factory _CheckoutTotals.fromItems(
     List<_CheckoutCartItem> items, {
-    required double couponDiscount,
+    double couponDiscount = 0,
   }) {
     double subtotal = 0;
     double mrpTotal = 0;
