@@ -29,6 +29,11 @@ BEGIN
   END;
 
   BEGIN
+    ALTER TABLE reviews DROP CONSTRAINT IF EXISTS reviews_product_id_fkey;
+  EXCEPTION WHEN OTHERS THEN NULL;
+  END;
+
+  BEGIN
     ALTER TABLE cart_items DROP CONSTRAINT IF EXISTS cart_items_product_id_fkey;
   EXCEPTION WHEN OTHERS THEN NULL;
   END;
@@ -45,6 +50,42 @@ BEGIN
       AND data_type NOT IN ('character varying', 'text', 'varchar')
   ) THEN
     ALTER TABLE products ALTER COLUMN id TYPE varchar(120) USING id::text;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'cart_items'
+      AND column_name = 'product_id'
+      AND data_type NOT IN ('character varying', 'text', 'varchar')
+  ) THEN
+    ALTER TABLE cart_items ALTER COLUMN product_id TYPE varchar(120) USING product_id::text;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'order_items'
+      AND column_name = 'product_id'
+      AND data_type NOT IN ('character varying', 'text', 'varchar')
+  ) THEN
+    ALTER TABLE order_items ALTER COLUMN product_id TYPE varchar(120) USING product_id::text;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'favorites'
+      AND column_name = 'product_id'
+      AND data_type NOT IN ('character varying', 'text', 'varchar')
+  ) THEN
+    ALTER TABLE favorites ALTER COLUMN product_id TYPE varchar(120) USING product_id::text;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'reviews'
+      AND column_name = 'product_id'
+      AND data_type NOT IN ('character varying', 'text', 'varchar')
+  ) THEN
+    ALTER TABLE reviews ALTER COLUMN product_id TYPE varchar(120) USING product_id::text;
   END IF;
 END $$;
 

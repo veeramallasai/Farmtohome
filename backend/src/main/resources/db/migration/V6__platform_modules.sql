@@ -84,6 +84,36 @@ CREATE TABLE IF NOT EXISTS delivery_slots (
 );
 CREATE INDEX IF NOT EXISTS idx_delivery_slots_lookup ON delivery_slots(method, slot_date, available, start_time);
 
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'products'
+      AND column_name = 'id'
+      AND data_type NOT IN ('character varying', 'text', 'varchar')
+  ) THEN
+    ALTER TABLE products ALTER COLUMN id TYPE varchar(120) USING id::text;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'favorites'
+      AND column_name = 'product_id'
+      AND data_type NOT IN ('character varying', 'text', 'varchar')
+  ) THEN
+    ALTER TABLE favorites ALTER COLUMN product_id TYPE varchar(120) USING product_id::text;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'reviews'
+      AND column_name = 'product_id'
+      AND data_type NOT IN ('character varying', 'text', 'varchar')
+  ) THEN
+    ALTER TABLE reviews ALTER COLUMN product_id TYPE varchar(120) USING product_id::text;
+  END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS favorites (
   id bigserial PRIMARY KEY,
   owner_uid varchar(160) NOT NULL,
