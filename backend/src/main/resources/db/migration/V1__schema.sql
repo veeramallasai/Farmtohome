@@ -120,57 +120,62 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS review_count integer NOT NULL DEFA
 ALTER TABLE products ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
 ALTER TABLE products ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 
+-- Explicit handling for category_id (legacy UUID column) to ensure it is optional and never assigned empty string
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'products' AND column_name = 'category_id'
+  ) THEN
+    ALTER TABLE products ALTER COLUMN category_id DROP NOT NULL;
+    ALTER TABLE products ALTER COLUMN category_id DROP DEFAULT;
+  END IF;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
 UPDATE products SET available = true WHERE available IS NULL;
 UPDATE products SET deleted = false WHERE deleted IS NULL;
 UPDATE products SET active = true WHERE active IS NULL;
 UPDATE products SET fresh = true WHERE fresh IS NULL;
 UPDATE products SET rating = 0 WHERE rating IS NULL;
 UPDATE products SET review_count = 0 WHERE review_count IS NULL;
-UPDATE products SET created_at = now() WHERE created_at IS NULL;
-UPDATE products SET updated_at = now() WHERE updated_at IS NULL;
+UPDATE products SET stock_quantity = 0 WHERE stock_quantity IS NULL;
+UPDATE products SET price = 1 WHERE price IS NULL;
+UPDATE products SET mrp = 1 WHERE mrp IS NULL;
+UPDATE products SET shop_price = 1 WHERE shop_price IS NULL;
+UPDATE products SET shop_mrp = 1 WHERE shop_mrp IS NULL;
+UPDATE products SET name = '' WHERE name IS NULL;
+UPDATE products SET english_name = '' WHERE english_name IS NULL;
+UPDATE products SET telugu_name = '' WHERE telugu_name IS NULL;
+UPDATE products SET description = '' WHERE description IS NULL;
+UPDATE products SET category = 'vegetables' WHERE category IS NULL;
+UPDATE products SET image_url = '' WHERE image_url IS NULL;
+UPDATE products SET unit = '' WHERE unit IS NULL;
+UPDATE products SET shop_unit = '' WHERE shop_unit IS NULL;
+UPDATE products SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL;
+UPDATE products SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL;
 
-DO $$
-DECLARE
-  col RECORD;
-BEGIN
-  FOR col IN
-    SELECT column_name, data_type
-    FROM information_schema.columns
-    WHERE table_name = 'products'
-      AND table_schema = current_schema()
-      AND is_nullable = 'NO'
-      AND column_default IS NULL
-      AND column_name != 'id'
-  LOOP
-    IF col.data_type = 'boolean' THEN
-      IF col.column_name = 'deleted' THEN
-        EXECUTE format('ALTER TABLE products ALTER COLUMN %I SET DEFAULT false', col.column_name);
-        EXECUTE format('UPDATE products SET %I = false WHERE %I IS NULL', col.column_name, col.column_name);
-      ELSE
-        EXECUTE format('ALTER TABLE products ALTER COLUMN %I SET DEFAULT true', col.column_name);
-        EXECUTE format('UPDATE products SET %I = true WHERE %I IS NULL', col.column_name, col.column_name);
-      END IF;
-    ELSIF col.data_type IN ('integer', 'bigint', 'smallint', 'numeric', 'double precision', 'real') THEN
-      EXECUTE format('ALTER TABLE products ALTER COLUMN %I SET DEFAULT 0', col.column_name);
-      EXECUTE format('UPDATE products SET %I = 0 WHERE %I IS NULL', col.column_name, col.column_name);
-    ELSIF col.data_type LIKE '%timestamp%' THEN
-      EXECUTE format('ALTER TABLE products ALTER COLUMN %I SET DEFAULT now()', col.column_name);
-      EXECUTE format('UPDATE products SET %I = now() WHERE %I IS NULL', col.column_name, col.column_name);
-    ELSE
-      EXECUTE format('ALTER TABLE products ALTER COLUMN %I SET DEFAULT ''''', col.column_name);
-      EXECUTE format('UPDATE products SET %I = '''' WHERE %I IS NULL', col.column_name, col.column_name);
-    END IF;
-  END LOOP;
-END $$;
-
-ALTER TABLE products ALTER COLUMN available SET DEFAULT true;
-ALTER TABLE products ALTER COLUMN deleted SET DEFAULT false;
+ALTER TABLE products ALTER COLUMN name SET DEFAULT '';
+ALTER TABLE products ALTER COLUMN english_name SET DEFAULT '';
+ALTER TABLE products ALTER COLUMN telugu_name SET DEFAULT '';
+ALTER TABLE products ALTER COLUMN description SET DEFAULT '';
+ALTER TABLE products ALTER COLUMN category SET DEFAULT 'vegetables';
+ALTER TABLE products ALTER COLUMN image_url SET DEFAULT '';
+ALTER TABLE products ALTER COLUMN unit SET DEFAULT '';
+ALTER TABLE products ALTER COLUMN shop_unit SET DEFAULT '';
+ALTER TABLE products ALTER COLUMN price SET DEFAULT 1;
+ALTER TABLE products ALTER COLUMN mrp SET DEFAULT 1;
+ALTER TABLE products ALTER COLUMN shop_price SET DEFAULT 1;
+ALTER TABLE products ALTER COLUMN shop_mrp SET DEFAULT 1;
+ALTER TABLE products ALTER COLUMN stock_quantity SET DEFAULT 0;
 ALTER TABLE products ALTER COLUMN active SET DEFAULT true;
 ALTER TABLE products ALTER COLUMN fresh SET DEFAULT true;
+ALTER TABLE products ALTER COLUMN available SET DEFAULT true;
+ALTER TABLE products ALTER COLUMN deleted SET DEFAULT false;
 ALTER TABLE products ALTER COLUMN rating SET DEFAULT 0;
 ALTER TABLE products ALTER COLUMN review_count SET DEFAULT 0;
-ALTER TABLE products ALTER COLUMN created_at SET DEFAULT now();
-ALTER TABLE products ALTER COLUMN updated_at SET DEFAULT now();
+ALTER TABLE products ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE products ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP;
 
 CREATE INDEX IF NOT EXISTS idx_products_category_active ON products(category, active);
 
