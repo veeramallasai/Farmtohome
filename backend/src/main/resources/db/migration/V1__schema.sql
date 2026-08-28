@@ -113,12 +113,14 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS shop_mrp numeric(12,2) NOT NULL DE
 ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_quantity integer NOT NULL DEFAULT 0;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS fresh boolean NOT NULL DEFAULT true;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS available boolean NOT NULL DEFAULT true;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS deleted boolean NOT NULL DEFAULT false;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS rating numeric(3,2) NOT NULL DEFAULT 0;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS review_count integer NOT NULL DEFAULT 0;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
 ALTER TABLE products ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 
+UPDATE products SET available = true WHERE available IS NULL;
 UPDATE products SET deleted = false WHERE deleted IS NULL;
 UPDATE products SET active = true WHERE active IS NULL;
 UPDATE products SET fresh = true WHERE fresh IS NULL;
@@ -127,6 +129,41 @@ UPDATE products SET review_count = 0 WHERE review_count IS NULL;
 UPDATE products SET created_at = now() WHERE created_at IS NULL;
 UPDATE products SET updated_at = now() WHERE updated_at IS NULL;
 
+DO $$
+DECLARE
+  col RECORD;
+BEGIN
+  FOR col IN
+    SELECT column_name, data_type
+    FROM information_schema.columns
+    WHERE table_name = 'products'
+      AND table_schema = current_schema()
+      AND is_nullable = 'NO'
+      AND column_default IS NULL
+      AND column_name != 'id'
+  LOOP
+    IF col.data_type = 'boolean' THEN
+      IF col.column_name = 'deleted' THEN
+        EXECUTE format('ALTER TABLE products ALTER COLUMN %I SET DEFAULT false', col.column_name);
+        EXECUTE format('UPDATE products SET %I = false WHERE %I IS NULL', col.column_name, col.column_name);
+      ELSE
+        EXECUTE format('ALTER TABLE products ALTER COLUMN %I SET DEFAULT true', col.column_name);
+        EXECUTE format('UPDATE products SET %I = true WHERE %I IS NULL', col.column_name, col.column_name);
+      END IF;
+    ELSIF col.data_type IN ('integer', 'bigint', 'smallint', 'numeric', 'double precision', 'real') THEN
+      EXECUTE format('ALTER TABLE products ALTER COLUMN %I SET DEFAULT 0', col.column_name);
+      EXECUTE format('UPDATE products SET %I = 0 WHERE %I IS NULL', col.column_name, col.column_name);
+    ELSIF col.data_type LIKE '%timestamp%' THEN
+      EXECUTE format('ALTER TABLE products ALTER COLUMN %I SET DEFAULT now()', col.column_name);
+      EXECUTE format('UPDATE products SET %I = now() WHERE %I IS NULL', col.column_name, col.column_name);
+    ELSE
+      EXECUTE format('ALTER TABLE products ALTER COLUMN %I SET DEFAULT ''''', col.column_name);
+      EXECUTE format('UPDATE products SET %I = '''' WHERE %I IS NULL', col.column_name, col.column_name);
+    END IF;
+  END LOOP;
+END $$;
+
+ALTER TABLE products ALTER COLUMN available SET DEFAULT true;
 ALTER TABLE products ALTER COLUMN deleted SET DEFAULT false;
 ALTER TABLE products ALTER COLUMN active SET DEFAULT true;
 ALTER TABLE products ALTER COLUMN fresh SET DEFAULT true;

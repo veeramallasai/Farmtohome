@@ -44,6 +44,8 @@ public class ProductEntity {
   @Column(nullable = false)
   private boolean fresh;
   @Column(nullable = false)
+  private boolean available = true;
+  @Column(nullable = false)
   private boolean deleted = false;
   @Column(nullable = false, precision = 3, scale = 2)
   private BigDecimal rating;
@@ -70,6 +72,8 @@ public class ProductEntity {
   public int getStockQuantity() { return stockQuantity; }
   public boolean isActive() { return active; }
   public boolean isFresh() { return fresh; }
+  public boolean isAvailable() { return available; }
+  public void setAvailable(boolean available) { this.available = available; }
   public boolean isDeleted() { return deleted; }
   public void setDeleted(boolean deleted) { this.deleted = deleted; }
   public BigDecimal getRating() { return rating; }
