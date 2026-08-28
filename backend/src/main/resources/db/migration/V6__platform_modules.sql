@@ -1,4 +1,4 @@
--- V6__platform_modules.sql - Complete, Fully Idempotent Platform Modules Migration
+-- V6__platform_modules.sql - Complete, Fully Idempotent Platform Modules Migration with UUID Primary Keys
 
 -- 1. categories table
 CREATE TABLE IF NOT EXISTS categories (
@@ -61,7 +61,6 @@ ALTER TABLE categories ALTER COLUMN deleted SET DEFAULT false;
 ALTER TABLE categories ALTER COLUMN created_at SET DEFAULT now();
 ALTER TABLE categories ALTER COLUMN updated_at SET DEFAULT now();
 
--- Drop NOT NULL on any legacy unknown columns on categories
 DO $$
 DECLARE
   col RECORD;
@@ -88,7 +87,7 @@ CREATE INDEX IF NOT EXISTS idx_categories_active_sort ON categories(active, sort
 
 -- 2. banners table
 CREATE TABLE IF NOT EXISTS banners (
-  id varchar(100) PRIMARY KEY,
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   title varchar(200) NOT NULL DEFAULT '',
   subtitle varchar(500) NOT NULL DEFAULT '',
   image_url varchar(500) NOT NULL DEFAULT '',
@@ -102,6 +101,23 @@ CREATE TABLE IF NOT EXISTS banners (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'banners' AND column_name = 'id'
+      AND data_type NOT IN ('uuid')
+  ) THEN
+    ALTER TABLE banners ALTER COLUMN id TYPE uuid USING (
+      CASE WHEN id ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+           THEN id::uuid
+           ELSE gen_random_uuid()
+      END
+    );
+  END IF;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
 
 ALTER TABLE banners ADD COLUMN IF NOT EXISTS title varchar(200) NOT NULL DEFAULT '';
 ALTER TABLE banners ADD COLUMN IF NOT EXISTS subtitle varchar(500) NOT NULL DEFAULT '';
@@ -130,7 +146,7 @@ CREATE INDEX IF NOT EXISTS idx_banners_visible ON banners(active, priority);
 
 -- 3. offers table
 CREATE TABLE IF NOT EXISTS offers (
-  id varchar(100) PRIMARY KEY,
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   title varchar(200) NOT NULL DEFAULT '',
   description varchar(500) NOT NULL DEFAULT '',
   code varchar(80) NOT NULL UNIQUE,
@@ -146,6 +162,23 @@ CREATE TABLE IF NOT EXISTS offers (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'offers' AND column_name = 'id'
+      AND data_type NOT IN ('uuid')
+  ) THEN
+    ALTER TABLE offers ALTER COLUMN id TYPE uuid USING (
+      CASE WHEN id ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+           THEN id::uuid
+           ELSE gen_random_uuid()
+      END
+    );
+  END IF;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
 
 ALTER TABLE offers ADD COLUMN IF NOT EXISTS title varchar(200) NOT NULL DEFAULT '';
 ALTER TABLE offers ADD COLUMN IF NOT EXISTS description varchar(500) NOT NULL DEFAULT '';
@@ -176,7 +209,7 @@ CREATE INDEX IF NOT EXISTS idx_offers_active ON offers(active, starts_at, ends_a
 
 -- 4. farmers table
 CREATE TABLE IF NOT EXISTS farmers (
-  id varchar(120) PRIMARY KEY,
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name varchar(180) NOT NULL DEFAULT '',
   farm_name varchar(220) NOT NULL DEFAULT '',
   location varchar(250) NOT NULL DEFAULT '',
@@ -191,6 +224,23 @@ CREATE TABLE IF NOT EXISTS farmers (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'farmers' AND column_name = 'id'
+      AND data_type NOT IN ('uuid')
+  ) THEN
+    ALTER TABLE farmers ALTER COLUMN id TYPE uuid USING (
+      CASE WHEN id ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+           THEN id::uuid
+           ELSE gen_random_uuid()
+      END
+    );
+  END IF;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
 
 ALTER TABLE farmers ADD COLUMN IF NOT EXISTS name varchar(180) NOT NULL DEFAULT '';
 ALTER TABLE farmers ADD COLUMN IF NOT EXISTS farm_name varchar(220) NOT NULL DEFAULT '';
@@ -224,7 +274,7 @@ CREATE INDEX IF NOT EXISTS idx_farmers_active_rating ON farmers(active, verified
 
 -- 5. delivery_slots table
 CREATE TABLE IF NOT EXISTS delivery_slots (
-  id varchar(120) PRIMARY KEY,
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   method varchar(40) NOT NULL DEFAULT 'standard',
   label varchar(160) NOT NULL DEFAULT '',
   start_time time NOT NULL DEFAULT '08:00:00',
@@ -237,6 +287,23 @@ CREATE TABLE IF NOT EXISTS delivery_slots (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'delivery_slots' AND column_name = 'id'
+      AND data_type NOT IN ('uuid')
+  ) THEN
+    ALTER TABLE delivery_slots ALTER COLUMN id TYPE uuid USING (
+      CASE WHEN id ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+           THEN id::uuid
+           ELSE gen_random_uuid()
+      END
+    );
+  END IF;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
 
 ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS method varchar(40) NOT NULL DEFAULT 'standard';
 ALTER TABLE delivery_slots ADD COLUMN IF NOT EXISTS label varchar(160) NOT NULL DEFAULT '';
@@ -268,7 +335,6 @@ DO $$
 DECLARE
   rec RECORD;
 BEGIN
-  -- Discover and drop any foreign key constraints on product_id dynamically
   FOR rec IN
     SELECT tc.table_name, tc.constraint_name
     FROM information_schema.table_constraints tc
@@ -520,7 +586,7 @@ ALTER TABLE payment_events ALTER COLUMN created_at SET DEFAULT now();
 
 CREATE INDEX IF NOT EXISTS idx_payment_events_payment ON payment_events(payment_id, created_at DESC);
 
--- 14. Seed Data (Fully Idempotent with complete NOT NULL fields including deleted)
+-- 14. Seed Data (Fully Idempotent with UUID PKs and business key existence guards)
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Vegetables') THEN
@@ -544,31 +610,79 @@ BEGIN
   END IF;
 END $$;
 
-INSERT INTO banners (id, title, subtitle, image_url, action_label, route, priority, active, deleted, created_at, updated_at)
-VALUES
-  ('fresh_vegetables', 'Fresh from local farms', 'Handpicked vegetables delivered with care', 'assets/images/categories/vegetables.png', 'Shop now', '/category-products?category=vegetables', 0, true, false, now(), now()),
-  ('seasonal_fruits', 'Seasonal favourites', 'Naturally fresh fruits at honest prices', 'assets/images/categories/seasonal.png', 'Explore', '/category-products?category=seasonal', 1, true, false, now(), now())
-ON CONFLICT (id) DO NOTHING;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM banners WHERE title = 'Fresh from local farms') THEN
+    INSERT INTO banners (id, title, subtitle, image_url, action_label, route, priority, active, deleted, created_at, updated_at)
+    VALUES (gen_random_uuid(), 'Fresh from local farms', 'Handpicked vegetables delivered with care', 'assets/images/categories/vegetables.png', 'Shop now', '/category-products?category=vegetables', 0, true, false, now(), now());
+  END IF;
 
-INSERT INTO offers (id, title, description, code, discount_type, discount_value, minimum_order, maximum_discount, active, deleted, created_at, updated_at)
-VALUES
-  ('33333333-3333-3333-3333-333333333333', 'Fresh 10% Off', 'Save on your first farm-fresh basket', 'FRESH10', 'percentage', 10, 299, 100, true, false, now(), now()),
-  ('44444444-4444-4444-4444-444444444444', '₹50 Farm Savings', 'Flat savings on orders above ₹499', 'FARM50', 'fixed', 50, 499, 0, true, false, now(), now())
-ON CONFLICT (code) DO NOTHING;
+  IF NOT EXISTS (SELECT 1 FROM banners WHERE title = 'Seasonal favourites') THEN
+    INSERT INTO banners (id, title, subtitle, image_url, action_label, route, priority, active, deleted, created_at, updated_at)
+    VALUES (gen_random_uuid(), 'Seasonal favourites', 'Naturally fresh fruits at honest prices', 'assets/images/categories/seasonal.png', 'Explore', '/category-products?category=seasonal', 1, true, false, now(), now());
+  END IF;
+END $$;
 
-INSERT INTO farmers (id, name, farm_name, location, rating, review_count, verified, experience_years, speciality, active, deleted, created_at, updated_at)
-VALUES
-  ('farmer_green_valley', 'Ravi Kumar', 'Green Valley Farms', 'Guntur, Andhra Pradesh', 4.8, 126, true, 14, 'Leafy vegetables', true, false, now(), now()),
-  ('farmer_sunrise', 'Lakshmi Devi', 'Sunrise Natural Farms', 'Vijayawada, Andhra Pradesh', 4.7, 98, true, 11, 'Seasonal fruits', true, false, now(), now()),
-  ('farmer_milky_way', 'Srinivas Reddy', 'Milky Way Dairy', 'Tenali, Andhra Pradesh', 4.9, 154, true, 18, 'Dairy products', true, false, now(), now())
-ON CONFLICT (id) DO NOTHING;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM offers WHERE code = 'FRESH10') THEN
+    INSERT INTO offers (id, title, description, code, discount_type, discount_value, minimum_order, maximum_discount, active, deleted, created_at, updated_at)
+    VALUES (gen_random_uuid(), 'Fresh 10% Off', 'Save on your first farm-fresh basket', 'FRESH10', 'percentage', 10, 299, 100, true, false, now(), now());
+  END IF;
 
-INSERT INTO delivery_slots (id, method, label, start_time, end_time, fee, capacity, booked_count, available, created_at, updated_at)
-VALUES
-  ('standard_morning', 'standard', 'Morning delivery', '08:00', '12:00', 35, 100, 0, true, now(), now()),
-  ('standard_evening', 'standard', 'Evening delivery', '16:00', '20:00', 35, 100, 0, true, now(), now()),
-  ('express_90', 'express', 'Express in 90 minutes', '09:00', '21:00', 69, 60, 0, true, now(), now()),
-  ('scheduled_morning', 'scheduled', '8 AM - 11 AM', '08:00', '11:00', 20, 80, 0, true, now(), now()),
-  ('scheduled_afternoon', 'scheduled', '1 PM - 4 PM', '13:00', '16:00', 20, 80, 0, true, now(), now()),
-  ('pickup_store', 'pickup', 'Store pickup', '08:00', '21:00', 0, 0, 0, true, now(), now())
-ON CONFLICT (id) DO NOTHING;
+  IF NOT EXISTS (SELECT 1 FROM offers WHERE code = 'FARM50') THEN
+    INSERT INTO offers (id, title, description, code, discount_type, discount_value, minimum_order, maximum_discount, active, deleted, created_at, updated_at)
+    VALUES (gen_random_uuid(), '₹50 Farm Savings', 'Flat savings on orders above ₹499', 'FARM50', 'fixed', 50, 499, 0, true, false, now(), now());
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM farmers WHERE farm_name = 'Green Valley Farms') THEN
+    INSERT INTO farmers (id, name, farm_name, location, rating, review_count, verified, experience_years, speciality, active, deleted, created_at, updated_at)
+    VALUES (gen_random_uuid(), 'Ravi Kumar', 'Green Valley Farms', 'Guntur, Andhra Pradesh', 4.8, 126, true, 14, 'Leafy vegetables', true, false, now(), now());
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM farmers WHERE farm_name = 'Sunrise Natural Farms') THEN
+    INSERT INTO farmers (id, name, farm_name, location, rating, review_count, verified, experience_years, speciality, active, deleted, created_at, updated_at)
+    VALUES (gen_random_uuid(), 'Lakshmi Devi', 'Sunrise Natural Farms', 'Vijayawada, Andhra Pradesh', 4.7, 98, true, 11, 'Seasonal fruits', true, false, now(), now());
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM farmers WHERE farm_name = 'Milky Way Dairy') THEN
+    INSERT INTO farmers (id, name, farm_name, location, rating, review_count, verified, experience_years, speciality, active, deleted, created_at, updated_at)
+    VALUES (gen_random_uuid(), 'Srinivas Reddy', 'Milky Way Dairy', 'Tenali, Andhra Pradesh', 4.9, 154, true, 18, 'Dairy products', true, false, now(), now());
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM delivery_slots WHERE label = 'Morning delivery') THEN
+    INSERT INTO delivery_slots (id, method, label, start_time, end_time, fee, capacity, booked_count, available, created_at, updated_at)
+    VALUES (gen_random_uuid(), 'standard', 'Morning delivery', '08:00', '12:00', 35, 100, 0, true, now(), now());
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM delivery_slots WHERE label = 'Evening delivery') THEN
+    INSERT INTO delivery_slots (id, method, label, start_time, end_time, fee, capacity, booked_count, available, created_at, updated_at)
+    VALUES (gen_random_uuid(), 'standard', 'Evening delivery', '16:00', '20:00', 35, 100, 0, true, now(), now());
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM delivery_slots WHERE label = 'Express in 90 minutes') THEN
+    INSERT INTO delivery_slots (id, method, label, start_time, end_time, fee, capacity, booked_count, available, created_at, updated_at)
+    VALUES (gen_random_uuid(), 'express', 'Express in 90 minutes', '09:00', '21:00', 69, 60, 0, true, now(), now());
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM delivery_slots WHERE label = '8 AM - 11 AM') THEN
+    INSERT INTO delivery_slots (id, method, label, start_time, end_time, fee, capacity, booked_count, available, created_at, updated_at)
+    VALUES (gen_random_uuid(), 'scheduled', '8 AM - 11 AM', '08:00', '11:00', 20, 80, 0, true, now(), now());
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM delivery_slots WHERE label = '1 PM - 4 PM') THEN
+    INSERT INTO delivery_slots (id, method, label, start_time, end_time, fee, capacity, booked_count, available, created_at, updated_at)
+    VALUES (gen_random_uuid(), 'scheduled', '1 PM - 4 PM', '13:00', '16:00', 20, 80, 0, true, now(), now());
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM delivery_slots WHERE label = 'Store pickup') THEN
+    INSERT INTO delivery_slots (id, method, label, start_time, end_time, fee, capacity, booked_count, available, created_at, updated_at)
+    VALUES (gen_random_uuid(), 'pickup', 'Store pickup', '08:00', '21:00', 0, 0, 0, true, now(), now());
+  END IF;
+END $$;
