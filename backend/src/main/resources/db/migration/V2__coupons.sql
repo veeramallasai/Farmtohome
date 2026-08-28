@@ -50,6 +50,48 @@ EXCEPTION
   WHEN OTHERS THEN NULL;
 END $$;
 
+-- Fix legacy non-standard NOT NULL columns on pre-existing coupons table
+DO $$
+DECLARE
+  r RECORD;
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'coupons'
+      AND column_name = 'coupon_code'
+      AND table_schema = current_schema()
+  ) THEN
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'coupons'
+        AND column_name = 'code'
+        AND table_schema = current_schema()
+    ) THEN
+      EXECUTE 'UPDATE coupons SET code = coupon_code WHERE (code IS NULL OR code = '''') AND coupon_code IS NOT NULL AND coupon_code != ''''';
+    END IF;
+    ALTER TABLE coupons ALTER COLUMN coupon_code DROP NOT NULL;
+    ALTER TABLE coupons ALTER COLUMN coupon_code SET DEFAULT '';
+  END IF;
+
+  FOR r IN
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_name = 'coupons'
+      AND table_schema = current_schema()
+      AND is_nullable = 'NO'
+      AND column_default IS NULL
+      AND column_name NOT IN (
+        'id', 'code', 'title', 'discount_type', 'discount_value',
+        'minimum_order', 'maximum_discount', 'active', 'deleted',
+        'created_at', 'updated_at'
+      )
+  LOOP
+    EXECUTE format('ALTER TABLE coupons ALTER COLUMN %I DROP NOT NULL', r.column_name);
+  END LOOP;
+EXCEPTION
+  WHEN OTHERS THEN NULL;
+END $$;
+
 -- Single INSERT per coupon with deleted set to false
 INSERT INTO coupons (
     id,
