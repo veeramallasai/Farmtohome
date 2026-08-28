@@ -357,39 +357,39 @@ ALTER TABLE payment_events ADD COLUMN IF NOT EXISTS created_at timestamptz NOT N
 
 CREATE INDEX IF NOT EXISTS idx_payment_events_payment ON payment_events(payment_id, created_at DESC);
 
-INSERT INTO categories (id, name, description, image_url, icon_name, sort_order)
+INSERT INTO categories (id, name, description, image_url, icon_name, sort_order, active, created_at, updated_at)
 VALUES
-  (gen_random_uuid(), 'Vegetables', 'Farm-fresh vegetables selected every day', 'assets/images/categories/vegetables.png', 'eco', 0),
-  (gen_random_uuid(), 'Fruits', 'Naturally fresh seasonal and everyday fruits', 'assets/images/categories/fruits.png', 'nutrition', 1),
-  (gen_random_uuid(), 'Dairy', 'Fresh milk and trusted dairy essentials', 'assets/images/categories/dairy.png', 'local_drink', 2),
-  (gen_random_uuid(), 'Seasonal', 'Limited seasonal harvests picked for you', 'assets/images/categories/seasonal.png', 'calendar_month', 3)
+  (gen_random_uuid(), 'Vegetables', 'Farm-fresh vegetables selected every day', 'assets/images/categories/vegetables.png', 'eco', 0, true, now(), now()),
+  (gen_random_uuid(), 'Fruits', 'Naturally fresh seasonal and everyday fruits', 'assets/images/categories/fruits.png', 'nutrition', 1, true, now(), now()),
+  (gen_random_uuid(), 'Dairy', 'Fresh milk and trusted dairy essentials', 'assets/images/categories/dairy.png', 'local_drink', 2, true, now(), now()),
+  (gen_random_uuid(), 'Seasonal', 'Limited seasonal harvests picked for you', 'assets/images/categories/seasonal.png', 'calendar_month', 3, true, now(), now())
 ON CONFLICT DO NOTHING;
 
-INSERT INTO banners (id, title, subtitle, image_url, action_label, route, priority)
+INSERT INTO banners (id, title, subtitle, image_url, action_label, route, priority, active, created_at, updated_at)
 VALUES
-  ('fresh_vegetables', 'Fresh from local farms', 'Handpicked vegetables delivered with care', 'assets/images/categories/vegetables.png', 'Shop now', '/category-products?category=vegetables', 0),
-  ('seasonal_fruits', 'Seasonal favourites', 'Naturally fresh fruits at honest prices', 'assets/images/categories/seasonal.png', 'Explore', '/category-products?category=seasonal', 1)
+  ('fresh_vegetables', 'Fresh from local farms', 'Handpicked vegetables delivered with care', 'assets/images/categories/vegetables.png', 'Shop now', '/category-products?category=vegetables', 0, true, now(), now()),
+  ('seasonal_fruits', 'Seasonal favourites', 'Naturally fresh fruits at honest prices', 'assets/images/categories/seasonal.png', 'Explore', '/category-products?category=seasonal', 1, true, now(), now())
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO offers (id, title, description, code, discount_type, discount_value, minimum_order, maximum_discount)
+INSERT INTO offers (id, title, description, code, discount_type, discount_value, minimum_order, maximum_discount, active, created_at, updated_at)
 VALUES
-  ('33333333-3333-3333-3333-333333333333', 'Fresh 10% Off', 'Save on your first farm-fresh basket', 'FRESH10', 'percentage', 10, 299, 100),
-  ('44444444-4444-4444-4444-444444444444', '₹50 Farm Savings', 'Flat savings on orders above ₹499', 'FARM50', 'fixed', 50, 499, 0)
+  ('33333333-3333-3333-3333-333333333333', 'Fresh 10% Off', 'Save on your first farm-fresh basket', 'FRESH10', 'percentage', 10, 299, 100, true, now(), now()),
+  ('44444444-4444-4444-4444-444444444444', '₹50 Farm Savings', 'Flat savings on orders above ₹499', 'FARM50', 'fixed', 50, 499, 0, true, now(), now())
 ON CONFLICT (code) DO NOTHING;
 
-INSERT INTO farmers (id, name, farm_name, location, rating, review_count, verified, experience_years, speciality)
+INSERT INTO farmers (id, name, farm_name, location, rating, review_count, verified, experience_years, speciality, active, created_at, updated_at)
 VALUES
-  ('farmer_green_valley', 'Ravi Kumar', 'Green Valley Farms', 'Guntur, Andhra Pradesh', 4.8, 126, true, 14, 'Leafy vegetables'),
-  ('farmer_sunrise', 'Lakshmi Devi', 'Sunrise Natural Farms', 'Vijayawada, Andhra Pradesh', 4.7, 98, true, 11, 'Seasonal fruits'),
-  ('farmer_milky_way', 'Srinivas Reddy', 'Milky Way Dairy', 'Tenali, Andhra Pradesh', 4.9, 154, true, 18, 'Dairy products')
+  ('farmer_green_valley', 'Ravi Kumar', 'Green Valley Farms', 'Guntur, Andhra Pradesh', 4.8, 126, true, 14, 'Leafy vegetables', true, now(), now()),
+  ('farmer_sunrise', 'Lakshmi Devi', 'Sunrise Natural Farms', 'Vijayawada, Andhra Pradesh', 4.7, 98, true, 11, 'Seasonal fruits', true, now(), now()),
+  ('farmer_milky_way', 'Srinivas Reddy', 'Milky Way Dairy', 'Tenali, Andhra Pradesh', 4.9, 154, true, 18, 'Dairy products', true, now(), now())
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO delivery_slots (id, method, label, start_time, end_time, fee, capacity)
+INSERT INTO delivery_slots (id, method, label, start_time, end_time, fee, capacity, booked_count, available, created_at, updated_at)
 VALUES
-  ('standard_morning', 'standard', 'Morning delivery', '08:00', '12:00', 35, 100),
-  ('standard_evening', 'standard', 'Evening delivery', '16:00', '20:00', 35, 100),
-  ('express_90', 'express', 'Express in 90 minutes', '09:00', '21:00', 69, 60),
-  ('scheduled_morning', 'scheduled', '8 AM - 11 AM', '08:00', '11:00', 20, 80),
-  ('scheduled_afternoon', 'scheduled', '1 PM - 4 PM', '13:00', '16:00', 20, 80),
-  ('pickup_store', 'pickup', 'Store pickup', '08:00', '21:00', 0, 0)
+  ('standard_morning', 'standard', 'Morning delivery', '08:00', '12:00', 35, 100, 0, true, now(), now()),
+  ('standard_evening', 'standard', 'Evening delivery', '16:00', '20:00', 35, 100, 0, true, now(), now()),
+  ('express_90', 'express', 'Express in 90 minutes', '09:00', '21:00', 69, 60, 0, true, now(), now()),
+  ('scheduled_morning', 'scheduled', '8 AM - 11 AM', '08:00', '11:00', 20, 80, 0, true, now(), now()),
+  ('scheduled_afternoon', 'scheduled', '1 PM - 4 PM', '13:00', '16:00', 20, 80, 0, true, now(), now()),
+  ('pickup_store', 'pickup', 'Store pickup', '08:00', '21:00', 0, 0, 0, true, now(), now())
 ON CONFLICT (id) DO NOTHING;
