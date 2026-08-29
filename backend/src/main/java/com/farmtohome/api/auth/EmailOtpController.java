@@ -81,4 +81,10 @@ public class EmailOtpController {
         service.verifyForEmail(request.email().trim().toLowerCase(), request.otp().trim()),
         "Email verified successfully.");
   }
+
+  @GetMapping({"/smtp-test", "/test-smtp"})
+  public ApiResponse<Map<String, Object>> testSmtp() {
+    return ApiResponse.ok(service.testSmtpConnection(), "SMTP connection status evaluated.");
+  }
 }
+

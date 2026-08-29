@@ -437,10 +437,54 @@ public class EmailOtpService {
     return user;
   }
 
+  public Map<String, Object> testSmtpConnection() {
+    Map<String, Object> details = new LinkedHashMap<>();
+    if (mailSender instanceof org.springframework.mail.javamail.JavaMailSenderImpl impl) {
+      details.put("host", impl.getHost());
+      details.put("port", impl.getPort());
+      details.put("username", impl.getUsername());
+      details.put("protocol", impl.getProtocol());
+      try {
+        impl.testConnection();
+        details.put("status", "SUCCESS");
+        details.put("connected", true);
+        details.put("message", "Successfully connected to Gmail SMTP server (" + impl.getHost() + ":" + impl.getPort() + ").");
+      } catch (Exception e) {
+        details.put("status", "FAILED");
+        details.put("connected", false);
+        details.put("error", e.getMessage());
+        details.put("cause", e.getCause() != null ? e.getCause().getMessage() : e.getClass().getName());
+        System.err.println("[SMTP-TEST-FAILED] Connection test to Gmail failed: " + e.getMessage());
+      }
+    } else {
+      details.put("status", "UNKNOWN");
+      details.put("connected", false);
+      details.put("message", "mailSender is not an instance of JavaMailSenderImpl");
+    }
+    return details;
+  }
+
   private void sendMail(String to, String otp) {
     System.out.println("=================================================");
-    System.out.println("[EMAIL-OTP] Generated OTP for " + to + " => " + otp);
+    System.out.println("[EMAIL-OTP] Initiating OTP send to " + to + " (OTP: " + otp + ")");
     System.out.println("=================================================");
+
+    // Verify backend can establish outbound SMTP connection to Gmail before returning success
+    if (mailSender instanceof org.springframework.mail.javamail.JavaMailSenderImpl impl) {
+      try {
+        System.out.println("[EMAIL-OTP-CONN] Pre-flight SMTP test to host: " + impl.getHost() + ":" + impl.getPort());
+        impl.testConnection();
+        System.out.println("[EMAIL-OTP-CONN] SMTP connection test successful.");
+      } catch (Exception connEx) {
+        System.err.println("[EMAIL-OTP-CONN-FAILED] Outbound SMTP connection test failed for " 
+            + impl.getHost() + ":" + impl.getPort() + ": " + connEx.getMessage());
+        connEx.printStackTrace();
+        throw new ApiException(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "Backend cannot connect to Gmail SMTP server (" + impl.getHost() + ":" + impl.getPort() + "). "
+                + "Please verify Railway outbound connectivity or Gmail App Password. Details: " + connEx.getMessage());
+      }
+    }
 
     try {
       SimpleMailMessage message = new SimpleMailMessage();
@@ -453,12 +497,18 @@ public class EmailOtpService {
               + "Do not share this OTP with anyone.");
       mailSender.send(message);
       System.out.println("[EMAIL-OTP-SUCCESS] SMTP Email dispatched successfully to " + to);
+    } catch (ApiException ae) {
+      throw ae;
     } catch (Exception error) {
       System.err.println("[EMAIL-OTP-FAILED] Could not send SMTP email to " + to + ": " + error.getMessage());
       error.printStackTrace();
+      String details = error.getMessage();
+      if (error.getCause() != null) {
+        details += " (Cause: " + error.getCause().getMessage() + ")";
+      }
       throw new ApiException(
           HttpStatus.INTERNAL_SERVER_ERROR,
-          "Failed to deliver OTP email: " + error.getMessage());
+          "Failed to deliver OTP email via Gmail SMTP: " + details);
     }
   }
 
