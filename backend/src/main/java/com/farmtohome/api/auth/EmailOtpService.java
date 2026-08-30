@@ -28,6 +28,11 @@ public class EmailOtpService {
   private final JavaMailSender mailSender;
   private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
   private final SecureRandom random = new SecureRandom();
+  private final String mailFrom;
+  private final String mailHost;
+  private final String mailPortStr;
+  private final String mailUsername;
+  private final String mailPassword;
   private final String resendApiKey;
   private final String brevoApiKey;
   private final String sendgridApiKey;
