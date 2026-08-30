@@ -624,7 +624,7 @@ public class EmailOtpService {
 
       java.net.http.HttpResponse<String> resp = httpClient.send(req, java.net.http.HttpResponse.BodyHandlers.ofString());
       if (resp.statusCode() >= 200 && resp.statusCode() < 300) {
-        System.out.println("[EMAIL-OTP-HTTP-SUCCESS] Sent OTP to " + mask(to) + " via Resend API");
+        System.out.println("[EMAIL-OTP-HTTP-SUCCESS] Sent OTP to " + mask(to) + " via Resend API (HTTPS Port 443)");
         return true;
       } else {
         System.err.println("[EMAIL-OTP-HTTP-FAIL] Resend API status " + resp.statusCode() + ": " + resp.body());
@@ -657,7 +657,7 @@ public class EmailOtpService {
 
       java.net.http.HttpResponse<String> resp = httpClient.send(req, java.net.http.HttpResponse.BodyHandlers.ofString());
       if (resp.statusCode() >= 200 && resp.statusCode() < 300) {
-        System.out.println("[EMAIL-OTP-HTTP-SUCCESS] Sent OTP to " + mask(to) + " via Brevo API");
+        System.out.println("[EMAIL-OTP-HTTP-SUCCESS] Sent OTP to " + mask(to) + " via Brevo API (HTTPS Port 443)");
         return true;
       } else {
         System.err.println("[EMAIL-OTP-HTTP-FAIL] Brevo API status " + resp.statusCode() + ": " + resp.body());
@@ -690,7 +690,7 @@ public class EmailOtpService {
 
       java.net.http.HttpResponse<String> resp = httpClient.send(req, java.net.http.HttpResponse.BodyHandlers.ofString());
       if (resp.statusCode() >= 200 && resp.statusCode() < 300) {
-        System.out.println("[EMAIL-OTP-HTTP-SUCCESS] Sent OTP to " + mask(to) + " via SendGrid API");
+        System.out.println("[EMAIL-OTP-HTTP-SUCCESS] Sent OTP to " + mask(to) + " via SendGrid API (HTTPS Port 443)");
         return true;
       } else {
         System.err.println("[EMAIL-OTP-HTTP-FAIL] SendGrid API status " + resp.statusCode() + ": " + resp.body());
@@ -707,15 +707,21 @@ public class EmailOtpService {
     System.out.println("[EMAIL-OTP] Dispatching OTP for " + mask(to) + " (OTP: " + otp + ")");
     System.out.println("=================================================");
 
+    // Priority 1: Check HTTPS Email API (Resend / Brevo / SendGrid over HTTPS Port 443)
+    // HTTPS requests bypass Railway outbound raw SMTP port blocks completely.
+    if (tryHttpApiSend(to, otp)) {
+      return;
+    }
+
     int primaryPort = 465;
     try { primaryPort = Integer.parseInt(mailPortStr.trim()); } catch (Exception ignored) {}
 
-    // Attempt 1: Primary JavaMailSender SMTP (Port 465/587)
+    // Priority 2: Primary JavaMailSender SMTP (Port 465/587)
     if (trySendWithSender(mailSender, to, otp, "Primary Sender (Port " + primaryPort + ")")) {
       return;
     }
 
-    // Attempt 2: Alternate SMTP port fallback (Port 587 if primary was 465, or Port 465 if primary was 587)
+    // Priority 3: Alternate SMTP port fallback (Port 587 if primary was 465, or Port 465 if primary was 587)
     int altPort = (primaryPort == 465) ? 587 : 465;
     try {
       JavaMailSender altSender = buildSenderForPort(altPort);
@@ -726,14 +732,10 @@ public class EmailOtpService {
       System.err.println("[EMAIL-OTP-FALLBACK-ERR] Could not initialize fallback sender on Port " + altPort + ": " + e.getMessage());
     }
 
-    // Attempt 3: HTTP Email API fallback (Resend / Brevo / SendGrid over HTTPS Port 443)
-    if (tryHttpApiSend(to, otp)) {
-      return;
-    }
-
-    // Attempt 4: Safe DB storage log fallback
+    // Priority 4: Host blocked DB storage fallback
     System.err.println("=================================================");
-    System.err.println("[EMAIL-OTP-HOST-BLOCKED] Outbound SMTP ports blocked on host.");
+    System.err.println("[EMAIL-OTP-HOST-BLOCKED] Raw SMTP ports (587/465) blocked on Railway.");
+    System.err.println("[EMAIL-OTP-HOST-BLOCKED] TIP: Add BREVO_API_KEY or RESEND_API_KEY in Railway env vars to send via HTTPS Port 443.");
     System.err.println("[EMAIL-OTP-HOST-BLOCKED] OTP for " + mask(to) + " saved in PostgreSQL DB. Code: " + otp);
     System.err.println("=================================================");
   }
