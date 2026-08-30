@@ -28,15 +28,34 @@ public class EmailOtpService {
   private final JavaMailSender mailSender;
   private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
   private final SecureRandom random = new SecureRandom();
-  private final String mailFrom;
+  private final String resendApiKey;
+  private final String brevoApiKey;
+  private final String sendgridApiKey;
+  private final java.net.http.HttpClient httpClient = java.net.http.HttpClient.newBuilder()
+      .connectTimeout(java.time.Duration.ofSeconds(10))
+      .build();
 
   public EmailOtpService(
       JdbcTemplate jdbc,
       JavaMailSender mailSender,
-      @Value("${app.mail-from}") String mailFrom) {
+      @Value("${app.mail-from:${MAIL_FROM:${spring.mail.username:${SPRING_MAIL_USERNAME:veeramallasaipichaiah456@gmail.com}}}}") String mailFrom,
+      @Value("${spring.mail.host:${SPRING_MAIL_HOST:${MAIL_HOST:smtp.gmail.com}}}") String mailHost,
+      @Value("${spring.mail.port:${SPRING_MAIL_PORT:${MAIL_PORT:465}}}") String mailPortStr,
+      @Value("${spring.mail.username:${SPRING_MAIL_USERNAME:${MAIL_USERNAME:${APP_MAIL_FROM:${MAIL_FROM:veeramallasaipichaiah456@gmail.com}}}}}") String mailUsername,
+      @Value("${spring.mail.password:${SPRING_MAIL_PASSWORD:${MAIL_PASSWORD:hinnvjmxxziliiim}}}") String mailPassword,
+      @Value("${RESEND_API_KEY:${MAIL_RESEND_API_KEY:}}") String resendApiKey,
+      @Value("${BREVO_API_KEY:${MAIL_BREVO_API_KEY:}}") String brevoApiKey,
+      @Value("${SENDGRID_API_KEY:${MAIL_SENDGRID_API_KEY:}}") String sendgridApiKey) {
     this.jdbc = jdbc;
     this.mailSender = mailSender;
     this.mailFrom = mailFrom;
+    this.mailHost = mailHost;
+    this.mailPortStr = mailPortStr;
+    this.mailUsername = mailUsername;
+    this.mailPassword = mailPassword;
+    this.resendApiKey = resendApiKey;
+    this.brevoApiKey = brevoApiKey;
+    this.sendgridApiKey = sendgridApiKey;
   }
 
   @jakarta.annotation.PostConstruct
@@ -439,35 +458,114 @@ public class EmailOtpService {
 
   public Map<String, Object> testSmtpConnection() {
     Map<String, Object> details = new LinkedHashMap<>();
+    details.put("configuredHost", mailHost);
+    details.put("configuredPort", mailPortStr);
+    details.put("configuredUsername", com.farmtohome.api.config.MailConfig.mask(mailUsername));
+    details.put("passwordConfigured", mailPassword != null && !mailPassword.isBlank() ? "YES (Length=" + mailPassword.trim().length() + ")" : "NO");
+    details.put("configuredFrom", mailFrom);
+
+    Map<String, Object> primaryDetails = new LinkedHashMap<>();
+    boolean primarySuccess = false;
     if (mailSender instanceof org.springframework.mail.javamail.JavaMailSenderImpl impl) {
-      details.put("host", impl.getHost());
-      details.put("port", impl.getPort());
-      details.put("username", impl.getUsername());
-      details.put("protocol", impl.getProtocol());
+      primaryDetails.put("host", impl.getHost());
+      primaryDetails.put("port", impl.getPort());
+      primaryDetails.put("username", com.farmtohome.api.config.MailConfig.mask(impl.getUsername()));
+      primaryDetails.put("protocol", impl.getProtocol());
       try {
         impl.testConnection();
-        details.put("status", "SUCCESS");
-        details.put("connected", true);
-        details.put("message", "Successfully connected to Gmail SMTP server (" + impl.getHost() + ":" + impl.getPort() + ").");
+        primaryDetails.put("status", "SUCCESS");
+        primaryDetails.put("connected", true);
+        primarySuccess = true;
       } catch (Exception e) {
-        details.put("status", "FAILED");
-        details.put("connected", false);
-        details.put("error", e.getMessage());
-        details.put("cause", e.getCause() != null ? e.getCause().getMessage() : e.getClass().getName());
-        System.err.println("[SMTP-TEST-FAILED] Connection test to Gmail failed: " + e.getMessage());
+        primaryDetails.put("status", "FAILED");
+        primaryDetails.put("connected", false);
+        primaryDetails.put("error", e.getMessage());
+        primaryDetails.put("cause", e.getCause() != null ? e.getCause().getMessage() : e.getClass().getName());
       }
     } else {
-      details.put("status", "UNKNOWN");
-      details.put("connected", false);
-      details.put("message", "mailSender is not an instance of JavaMailSenderImpl");
+      primaryDetails.put("status", "UNKNOWN");
+      primaryDetails.put("connected", false);
+      primaryDetails.put("message", "mailSender is not JavaMailSenderImpl");
     }
+    details.put("primarySender", primaryDetails);
+
+    int primaryPort = 465;
+    try { primaryPort = Integer.parseInt(mailPortStr.trim()); } catch (Exception ignored) {}
+    int altPort = (primaryPort == 465) ? 587 : 465;
+
+    Map<String, Object> altDetails = new LinkedHashMap<>();
+    boolean altSuccess = false;
+    try {
+      org.springframework.mail.javamail.JavaMailSenderImpl altSender = buildSenderForPort(altPort);
+      altDetails.put("host", altSender.getHost());
+      altDetails.put("port", altSender.getPort());
+      altDetails.put("username", com.farmtohome.api.config.MailConfig.mask(altSender.getUsername()));
+      try {
+        altSender.testConnection();
+        altDetails.put("status", "SUCCESS");
+        altDetails.put("connected", true);
+        altSuccess = true;
+      } catch (Exception e) {
+        altDetails.put("status", "FAILED");
+        altDetails.put("connected", false);
+        altDetails.put("error", e.getMessage());
+        altDetails.put("cause", e.getCause() != null ? e.getCause().getMessage() : e.getClass().getName());
+      }
+    } catch (Exception e) {
+      altDetails.put("status", "ERROR");
+      altDetails.put("error", e.getMessage());
+    }
+    details.put("alternateSender", altDetails);
+
+    boolean overall = primarySuccess || altSuccess;
+    details.put("connected", overall);
+    details.put("status", overall ? "SUCCESS" : "FAILED");
+    details.put("message", overall
+        ? "SMTP connection test succeeded (" + (primarySuccess ? "Primary Port " + primaryPort : "Alternate Port " + altPort) + " working)."
+        : "SMTP connection test failed on both Port " + primaryPort + " and Port " + altPort + ".");
+
     return details;
+  }
+
+  private org.springframework.mail.javamail.JavaMailSenderImpl buildSenderForPort(int port) {
+    org.springframework.mail.javamail.JavaMailSenderImpl sender = new org.springframework.mail.javamail.JavaMailSenderImpl();
+    String host = (mailHost != null && !mailHost.isBlank()) ? mailHost.trim() : "smtp.gmail.com";
+    sender.setHost(host);
+    sender.setPort(port);
+    sender.setUsername(mailUsername != null ? mailUsername.trim() : "");
+    sender.setPassword(mailPassword != null ? mailPassword.trim() : "");
+    sender.setProtocol("smtp");
+    sender.setDefaultEncoding("UTF-8");
+
+    java.util.Properties props = sender.getJavaMailProperties();
+    props.put("mail.smtp.auth", "true");
+    props.put("mail.smtp.ssl.trust", "*");
+    props.put("mail.smtp.ssl.protocols", "TLSv1.2 TLSv1.3");
+    props.put("mail.smtp.connectiontimeout", "15000");
+    props.put("mail.smtp.timeout", "15000");
+    props.put("mail.smtp.writetimeout", "15000");
+
+    if (port == 465) {
+      props.put("mail.smtp.ssl.enable", "true");
+      props.put("mail.smtp.starttls.enable", "false");
+      props.put("mail.smtp.socketFactory.port", "465");
+      props.put("mail.smtp.socketFactory.class", "javax.net.ssl.SSLSocketFactory");
+      props.put("mail.smtp.socketFactory.fallback", "false");
+    } else {
+      props.put("mail.smtp.ssl.enable", "false");
+      props.put("mail.smtp.starttls.enable", "true");
+      props.put("mail.smtp.starttls.required", "true");
+      props.remove("mail.smtp.socketFactory.port");
+      props.remove("mail.smtp.socketFactory.class");
+      props.remove("mail.smtp.socketFactory.fallback");
+    }
+    return sender;
   }
 
   private boolean trySendWithSender(JavaMailSender sender, String to, String otp, String label) {
     try {
       if (sender instanceof org.springframework.mail.javamail.JavaMailSenderImpl impl) {
-        System.out.println("[EMAIL-OTP] Attempting SMTP send via " + label + " (" + impl.getHost() + ":" + impl.getPort() + ")...");
+        System.out.println("[EMAIL-OTP] Attempting SMTP send via " + label + " (" + impl.getHost() + ":" + impl.getPort() + " as " + com.farmtohome.api.config.MailConfig.mask(impl.getUsername()) + ")...");
       }
       SimpleMailMessage message = new SimpleMailMessage();
       String senderAddr = (mailFrom != null && !mailFrom.isBlank()) ? mailFrom : "veeramallasaipichaiah456@gmail.com";
@@ -479,7 +577,7 @@ public class EmailOtpService {
               + "This OTP expires in " + OTP_TTL_MINUTES + " minutes.\n"
               + "Do not share this OTP with anyone.");
       sender.send(message);
-      System.out.println("[EMAIL-OTP-SUCCESS] SMTP Email dispatched successfully to " + to + " via " + label);
+      System.out.println("[EMAIL-OTP-SUCCESS] SMTP Email dispatched successfully to " + mask(to) + " via " + label);
       return true;
     } catch (Exception ex) {
       System.err.println("[EMAIL-OTP-ATTEMPT-FAILED] SMTP send via " + label + " failed: " + ex.getMessage());
@@ -487,58 +585,159 @@ public class EmailOtpService {
     }
   }
 
+  private boolean tryHttpApiSend(String to, String otp) {
+    if (resendApiKey != null && !resendApiKey.isBlank()) {
+      if (sendViaResend(to, otp)) return true;
+    }
+    if (brevoApiKey != null && !brevoApiKey.isBlank()) {
+      if (sendViaBrevo(to, otp)) return true;
+    }
+    if (sendgridApiKey != null && !sendgridApiKey.isBlank()) {
+      if (sendViaSendGrid(to, otp)) return true;
+    }
+    return false;
+  }
+
+  private boolean sendViaResend(String to, String otp) {
+    try {
+      String fromAddr = (mailFrom != null && !mailFrom.isBlank()) ? mailFrom : "veeramallasaipichaiah456@gmail.com";
+      String body = """
+          {
+            "from": "%s",
+            "to": ["%s"],
+            "subject": "Farm To Home - Email Verification OTP",
+            "text": "Your Farm To Home verification OTP is: %s\\n\\nThis OTP expires in %d minutes.\\nDo not share this OTP with anyone."
+          }
+          """.formatted(fromAddr, to, otp, OTP_TTL_MINUTES);
+
+      java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
+          .uri(java.net.URI.create("https://api.resend.com/emails"))
+          .header("Authorization", "Bearer " + resendApiKey.trim())
+          .header("Content-Type", "application/json")
+          .POST(java.net.http.HttpRequest.BodyPublishers.ofString(body))
+          .build();
+
+      java.net.http.HttpResponse<String> resp = httpClient.send(req, java.net.http.HttpResponse.BodyHandlers.ofString());
+      if (resp.statusCode() >= 200 && resp.statusCode() < 300) {
+        System.out.println("[EMAIL-OTP-HTTP-SUCCESS] Sent OTP to " + mask(to) + " via Resend API");
+        return true;
+      } else {
+        System.err.println("[EMAIL-OTP-HTTP-FAIL] Resend API status " + resp.statusCode() + ": " + resp.body());
+        return false;
+      }
+    } catch (Exception e) {
+      System.err.println("[EMAIL-OTP-HTTP-ERR] Resend API failed: " + e.getMessage());
+      return false;
+    }
+  }
+
+  private boolean sendViaBrevo(String to, String otp) {
+    try {
+      String fromAddr = (mailFrom != null && !mailFrom.isBlank()) ? mailFrom : "veeramallasaipichaiah456@gmail.com";
+      String body = """
+          {
+            "sender": {"name": "Farm To Home", "email": "%s"},
+            "to": [{"email": "%s"}],
+            "subject": "Farm To Home - Email Verification OTP",
+            "textContent": "Your Farm To Home verification OTP is: %s\\n\\nThis OTP expires in %d minutes.\\nDo not share this OTP with anyone."
+          }
+          """.formatted(fromAddr, to, otp, OTP_TTL_MINUTES);
+
+      java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
+          .uri(java.net.URI.create("https://api.brevo.com/v3/smtp/email"))
+          .header("api-key", brevoApiKey.trim())
+          .header("Content-Type", "application/json")
+          .POST(java.net.http.HttpRequest.BodyPublishers.ofString(body))
+          .build();
+
+      java.net.http.HttpResponse<String> resp = httpClient.send(req, java.net.http.HttpResponse.BodyHandlers.ofString());
+      if (resp.statusCode() >= 200 && resp.statusCode() < 300) {
+        System.out.println("[EMAIL-OTP-HTTP-SUCCESS] Sent OTP to " + mask(to) + " via Brevo API");
+        return true;
+      } else {
+        System.err.println("[EMAIL-OTP-HTTP-FAIL] Brevo API status " + resp.statusCode() + ": " + resp.body());
+        return false;
+      }
+    } catch (Exception e) {
+      System.err.println("[EMAIL-OTP-HTTP-ERR] Brevo API failed: " + e.getMessage());
+      return false;
+    }
+  }
+
+  private boolean sendViaSendGrid(String to, String otp) {
+    try {
+      String fromAddr = (mailFrom != null && !mailFrom.isBlank()) ? mailFrom : "veeramallasaipichaiah456@gmail.com";
+      String body = """
+          {
+            "personalizations": [{"to": [{"email": "%s"}]}],
+            "from": {"email": "%s", "name": "Farm To Home"},
+            "subject": "Farm To Home - Email Verification OTP",
+            "content": [{"type": "text/plain", "value": "Your Farm To Home verification OTP is: %s\\n\\nThis OTP expires in %d minutes."}]
+          }
+          """.formatted(to, fromAddr, otp, OTP_TTL_MINUTES);
+
+      java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
+          .uri(java.net.URI.create("https://api.sendgrid.com/v3/mail/send"))
+          .header("Authorization", "Bearer " + sendgridApiKey.trim())
+          .header("Content-Type", "application/json")
+          .POST(java.net.http.HttpRequest.BodyPublishers.ofString(body))
+          .build();
+
+      java.net.http.HttpResponse<String> resp = httpClient.send(req, java.net.http.HttpResponse.BodyHandlers.ofString());
+      if (resp.statusCode() >= 200 && resp.statusCode() < 300) {
+        System.out.println("[EMAIL-OTP-HTTP-SUCCESS] Sent OTP to " + mask(to) + " via SendGrid API");
+        return true;
+      } else {
+        System.err.println("[EMAIL-OTP-HTTP-FAIL] SendGrid API status " + resp.statusCode() + ": " + resp.body());
+        return false;
+      }
+    } catch (Exception e) {
+      System.err.println("[EMAIL-OTP-HTTP-ERR] SendGrid API failed: " + e.getMessage());
+      return false;
+    }
+  }
+
   private void sendMail(String to, String otp) {
     System.out.println("=================================================");
-    System.out.println("[EMAIL-OTP] Dispatching OTP for " + to + " (OTP: " + otp + ")");
+    System.out.println("[EMAIL-OTP] Dispatching OTP for " + mask(to) + " (OTP: " + otp + ")");
     System.out.println("=================================================");
 
-    // Attempt 1: Configured JavaMailSender (Port 465 SSL primary)
-    if (trySendWithSender(mailSender, to, otp, "Primary Sender (Port 465 SSL)")) {
+    int primaryPort = 465;
+    try { primaryPort = Integer.parseInt(mailPortStr.trim()); } catch (Exception ignored) {}
+
+    // Attempt 1: Primary JavaMailSender SMTP (Port 465/587)
+    if (trySendWithSender(mailSender, to, otp, "Primary Sender (Port " + primaryPort + ")")) {
       return;
     }
 
-    // Attempt 2: Fallback to Port 587 STARTTLS
+    // Attempt 2: Alternate SMTP port fallback (Port 587 if primary was 465, or Port 465 if primary was 587)
+    int altPort = (primaryPort == 465) ? 587 : 465;
     try {
-      org.springframework.mail.javamail.JavaMailSenderImpl startTlsSender = new org.springframework.mail.javamail.JavaMailSenderImpl();
-      startTlsSender.setHost("smtp.gmail.com");
-      startTlsSender.setPort(587);
-      startTlsSender.setUsername("veeramallasaipichaiah456@gmail.com");
-      startTlsSender.setPassword("hinnvjmxxziliiim");
-
-      java.util.Properties props = startTlsSender.getJavaMailProperties();
-      props.put("mail.smtp.auth", "true");
-      props.put("mail.smtp.starttls.enable", "true");
-      props.put("mail.smtp.starttls.required", "true");
-      props.put("mail.smtp.ssl.trust", "smtp.gmail.com");
-      props.put("mail.smtp.connectiontimeout", "4000");
-      props.put("mail.smtp.timeout", "4000");
-      props.put("mail.smtp.writetimeout", "4000");
-
-      if (trySendWithSender(startTlsSender, to, otp, "Fallback Port 587 STARTTLS")) {
+      JavaMailSender altSender = buildSenderForPort(altPort);
+      if (trySendWithSender(altSender, to, otp, "Alternate Fallback (Port " + altPort + ")")) {
         return;
       }
     } catch (Exception e) {
-      System.err.println("[EMAIL-OTP-FALLBACK-ERR] Could not initialize STARTTLS sender: " + e.getMessage());
+      System.err.println("[EMAIL-OTP-FALLBACK-ERR] Could not initialize fallback sender on Port " + altPort + ": " + e.getMessage());
     }
 
-    // Attempt 3: If host environment (e.g. Railway) blocks outbound raw SMTP ports completely,
-    // log a diagnostic warning and allow API payload delivery so user verification never fails.
+    // Attempt 3: HTTP Email API fallback (Resend / Brevo / SendGrid over HTTPS Port 443)
+    if (tryHttpApiSend(to, otp)) {
+      return;
+    }
+
+    // Attempt 4: Safe DB storage log fallback
     System.err.println("=================================================");
-    System.err.println("[EMAIL-OTP-HOST-BLOCKED] Host environment (Railway) blocks outbound SMTP ports.");
-    System.err.println("[EMAIL-OTP-HOST-BLOCKED] OTP for " + to + " registered in database: " + otp);
+    System.err.println("[EMAIL-OTP-HOST-BLOCKED] Outbound SMTP ports blocked on host.");
+    System.err.println("[EMAIL-OTP-HOST-BLOCKED] OTP for " + mask(to) + " saved in PostgreSQL DB. Code: " + otp);
     System.err.println("=================================================");
   }
 
   private String mask(String email) {
-    int at = email.indexOf('@');
-    if (at <= 1) return email;
-    String local = email.substring(0, at);
-    return local.substring(0, 1)
-        + "***"
-        + local.substring(local.length() - 1)
-        + email.substring(at);
+    return com.farmtohome.api.config.MailConfig.mask(email);
   }
 
   private record UserEmail(String email, boolean emailVerified) {}
   private record OtpRow(long id, String otpHash, Instant expiresAt, int attempts) {}
 }
+

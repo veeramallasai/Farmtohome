@@ -32,26 +32,19 @@ spring:
   jackson:
     default-property-inclusion: non_null
   mail:
-    host: ${SPRING_MAIL_HOST:${MAIL_HOST:smtp.gmail.com}}
-    port: ${SPRING_MAIL_PORT:${MAIL_PORT:465}}
-    username: ${SPRING_MAIL_USERNAME:${MAIL_USERNAME:veeramallasaipichaiah456@gmail.com}}
-    password: ${SPRING_MAIL_PASSWORD:${MAIL_PASSWORD:hinnvjmxxziliiim}}
+    host: ${spring.mail.host:${SPRING_MAIL_HOST:${MAIL_HOST:smtp.gmail.com}}}
+    port: ${spring.mail.port:${SPRING_MAIL_PORT:${MAIL_PORT:465}}}
+    username: ${spring.mail.username:${SPRING_MAIL_USERNAME:${MAIL_USERNAME:${APP_MAIL_FROM:${MAIL_FROM:veeramallasaipichaiah456@gmail.com}}}}}
+    password: ${spring.mail.password:${SPRING_MAIL_PASSWORD:${MAIL_PASSWORD:hinnvjmxxziliiim}}}
     properties:
       mail:
         smtp:
           auth: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:true}
-          starttls:
-            enable: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:false}
-            required: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_REQUIRED:false}
           ssl:
-            enable: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_ENABLE:true}
-            trust: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_TRUST:smtp.gmail.com}
-          socketFactory:
-            port: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_SOCKETFACTORY_PORT:465}
-            class: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_SOCKETFACTORY_CLASS:javax.net.ssl.SSLSocketFactory}
-          connectiontimeout: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_CONNECTIONTIMEOUT:4000}
-          timeout: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_TIMEOUT:4000}
-          writetimeout: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_WRITETIMEOUT:4000}
+            trust: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_TRUST:*}
+          connectiontimeout: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_CONNECTIONTIMEOUT:15000}
+          timeout: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_TIMEOUT:15000}
+          writetimeout: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_WRITETIMEOUT:15000}
 
 management:
   endpoints:
@@ -65,7 +58,7 @@ management:
 
 app:
   cors-origins: "${CORS_ORIGINS:https://flutter-frontend-production-e8d6.up.railway.app,https://*.railway.app,https://*.up.railway.app,http://localhost:*,*}"
-  mail-from: ${MAIL_FROM:veeramallasaipichaiah456@gmail.com}
+  mail-from: ${APP_MAIL_FROM:${MAIL_FROM:${spring.mail.username:${SPRING_MAIL_USERNAME:veeramallasaipichaiah456@gmail.com}}}}
 
 
 logging:
