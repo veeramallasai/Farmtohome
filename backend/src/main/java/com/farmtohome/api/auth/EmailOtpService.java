@@ -646,10 +646,10 @@ public class EmailOtpService {
   }
 
   private String resolveFromAddress() {
-    if (mailFrom != null && !mailFrom.isBlank() && mailFrom.contains("@")) {
+    if (mailFrom != null && !mailFrom.isBlank() && mailFrom.contains("@") && !mailFrom.toLowerCase().contains("smtp-brevo.com")) {
       return mailFrom.trim();
     }
-    if (mailUsername != null && !mailUsername.isBlank() && mailUsername.contains("@")) {
+    if (mailUsername != null && !mailUsername.isBlank() && mailUsername.contains("@") && !mailUsername.toLowerCase().contains("smtp-brevo.com")) {
       return mailUsername.trim();
     }
     return "veeramallasaipichaiah456@gmail.com";
