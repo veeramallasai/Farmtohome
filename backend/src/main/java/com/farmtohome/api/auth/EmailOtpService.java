@@ -466,8 +466,11 @@ public class EmailOtpService {
     details.put("configuredHost", mailHost);
     details.put("configuredPort", mailPortStr);
     details.put("configuredUsername", com.farmtohome.api.config.MailConfig.mask(mailUsername));
-    details.put("passwordConfigured", mailPassword != null && !mailPassword.isBlank() ? "YES (Length=" + mailPassword.trim().length() + ")" : "NO");
+    details.put("passwordConfigured", mailPassword != null && !mailPassword.isBlank() ? "YES (Length=" + mailPassword.trim().replaceAll("\\s+", "").length() + ")" : "NO");
     details.put("configuredFrom", mailFrom);
+    details.put("brevoApiKeyResolved", !resolveBrevoApiKey().isBlank() ? "YES" : "NO");
+    details.put("resendApiKeyResolved", !resolveResendApiKey().isBlank() ? "YES" : "NO");
+    details.put("sendgridApiKeyResolved", !resolveSendGridApiKey().isBlank() ? "YES" : "NO");
 
     Map<String, Object> primaryDetails = new LinkedHashMap<>();
     boolean primarySuccess = false;
@@ -546,9 +549,9 @@ public class EmailOtpService {
     props.put("mail.smtp.auth", "true");
     props.put("mail.smtp.ssl.trust", "*");
     props.put("mail.smtp.ssl.protocols", "TLSv1.2 TLSv1.3");
-    props.put("mail.smtp.connectiontimeout", "3000");
-    props.put("mail.smtp.timeout", "3000");
-    props.put("mail.smtp.writetimeout", "3000");
+    props.put("mail.smtp.connectiontimeout", "10000");
+    props.put("mail.smtp.timeout", "10000");
+    props.put("mail.smtp.writetimeout", "10000");
 
     if (port == 465) {
       props.put("mail.smtp.ssl.enable", "true");
@@ -600,25 +603,80 @@ public class EmailOtpService {
     }
   }
 
-  private boolean tryHttpApiSend(String to, String otp) {
-    if (resendApiKey != null && !resendApiKey.isBlank()) {
-      System.out.println("[EMAIL-OTP-EXEC] Attempting HTTPS Email send via Resend API...");
-      if (sendViaResend(to, otp)) return true;
-    }
+  private String resolveBrevoApiKey() {
     if (brevoApiKey != null && !brevoApiKey.isBlank()) {
-      System.out.println("[EMAIL-OTP-EXEC] Attempting HTTPS Email send via Brevo API...");
-      if (sendViaBrevo(to, otp)) return true;
+      return brevoApiKey.trim();
     }
+    String cleanPw = (mailPassword != null) ? mailPassword.trim().replaceAll("\\s+", "") : "";
+    if (cleanPw.startsWith("xkeysib-") || cleanPw.startsWith("xsmtpsib-")) {
+      return cleanPw;
+    }
+    if (mailHost != null && (mailHost.contains("brevo") || mailHost.contains("sendinblue")) && !cleanPw.isBlank()) {
+      return cleanPw;
+    }
+    return "";
+  }
+
+  private String resolveResendApiKey() {
+    if (resendApiKey != null && !resendApiKey.isBlank()) {
+      return resendApiKey.trim();
+    }
+    String cleanPw = (mailPassword != null) ? mailPassword.trim().replaceAll("\\s+", "") : "";
+    if (cleanPw.startsWith("re_")) {
+      return cleanPw;
+    }
+    if (mailHost != null && mailHost.contains("resend") && !cleanPw.isBlank()) {
+      return cleanPw;
+    }
+    return "";
+  }
+
+  private String resolveSendGridApiKey() {
     if (sendgridApiKey != null && !sendgridApiKey.isBlank()) {
-      System.out.println("[EMAIL-OTP-EXEC] Attempting HTTPS Email send via SendGrid API...");
-      if (sendViaSendGrid(to, otp)) return true;
+      return sendgridApiKey.trim();
+    }
+    String cleanPw = (mailPassword != null) ? mailPassword.trim().replaceAll("\\s+", "") : "";
+    if (cleanPw.startsWith("SG.")) {
+      return cleanPw;
+    }
+    if (mailHost != null && mailHost.contains("sendgrid") && !cleanPw.isBlank()) {
+      return cleanPw;
+    }
+    return "";
+  }
+
+  private String resolveFromAddress() {
+    if (mailFrom != null && !mailFrom.isBlank() && mailFrom.contains("@")) {
+      return mailFrom.trim();
+    }
+    if (mailUsername != null && !mailUsername.isBlank() && mailUsername.contains("@")) {
+      return mailUsername.trim();
+    }
+    return "veeramallasaipichaiah456@gmail.com";
+  }
+
+  private boolean tryHttpApiSend(String to, String otp) {
+    String brevoKey = resolveBrevoApiKey();
+    if (!brevoKey.isBlank()) {
+      System.out.println("[EMAIL-OTP-EXEC] Attempting HTTPS Email send via Brevo API (HTTPS Port 443)...");
+      if (sendViaBrevo(to, otp, brevoKey)) return true;
+    }
+    String resendKey = resolveResendApiKey();
+    if (!resendKey.isBlank()) {
+      System.out.println("[EMAIL-OTP-EXEC] Attempting HTTPS Email send via Resend API (HTTPS Port 443)...");
+      if (sendViaResend(to, otp, resendKey)) return true;
+    }
+    String sgKey = resolveSendGridApiKey();
+    if (!sgKey.isBlank()) {
+      System.out.println("[EMAIL-OTP-EXEC] Attempting HTTPS Email send via SendGrid API (HTTPS Port 443)...");
+      if (sendViaSendGrid(to, otp, sgKey)) return true;
     }
     return false;
   }
 
-  private boolean sendViaResend(String to, String otp) {
+  private boolean sendViaResend(String to, String otp, String key) {
     try {
-      String fromAddr = (mailFrom != null && !mailFrom.isBlank()) ? mailFrom : "veeramallasaipichaiah456@gmail.com";
+      String fromAddr = resolveFromAddress();
       String body = """
           {
             "from": "%s",
@@ -630,7 +688,7 @@ public class EmailOtpService {
 
       java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
           .uri(java.net.URI.create("https://api.resend.com/emails"))
-          .header("Authorization", "Bearer " + resendApiKey.trim())
+          .header("Authorization", "Bearer " + key.trim())
           .header("Content-Type", "application/json")
           .POST(java.net.http.HttpRequest.BodyPublishers.ofString(body))
           .build();
@@ -650,9 +708,9 @@ public class EmailOtpService {
     }
   }
 
-  private boolean sendViaBrevo(String to, String otp) {
+  private boolean sendViaBrevo(String to, String otp, String key) {
     try {
-      String fromAddr = (mailFrom != null && !mailFrom.isBlank()) ? mailFrom : "veeramallasaipichaiah456@gmail.com";
+      String fromAddr = resolveFromAddress();
       String body = """
           {
             "sender": {"name": "Farm To Home", "email": "%s"},
@@ -664,7 +722,7 @@ public class EmailOtpService {
 
       java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
           .uri(java.net.URI.create("https://api.brevo.com/v3/smtp/email"))
-          .header("api-key", brevoApiKey.trim())
+          .header("api-key", key.trim())
           .header("Content-Type", "application/json")
           .POST(java.net.http.HttpRequest.BodyPublishers.ofString(body))
           .build();
@@ -684,9 +742,9 @@ public class EmailOtpService {
     }
   }
 
-  private boolean sendViaSendGrid(String to, String otp) {
+  private boolean sendViaSendGrid(String to, String otp, String key) {
     try {
-      String fromAddr = (mailFrom != null && !mailFrom.isBlank()) ? mailFrom : "veeramallasaipichaiah456@gmail.com";
+      String fromAddr = resolveFromAddress();
       String body = """
           {
             "personalizations": [{"to": [{"email": "%s"}]}],
@@ -698,7 +756,7 @@ public class EmailOtpService {
 
       java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
           .uri(java.net.URI.create("https://api.sendgrid.com/v3/mail/send"))
-          .header("Authorization", "Bearer " + sendgridApiKey.trim())
+          .header("Authorization", "Bearer " + key.trim())
           .header("Content-Type", "application/json")
           .POST(java.net.http.HttpRequest.BodyPublishers.ofString(body))
           .build();
