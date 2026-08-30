@@ -36,9 +36,27 @@ public class AppUserService {
     String displayName = (firstName + " " + lastName).trim();
     if (displayName.isEmpty()) displayName = preferred(user.getDisplayName(), cleanUid);
 
+    String email = preferred(request.email(), user.getEmail());
+    if (email.isEmpty()) {
+      if (cleanUid.contains("@")) {
+        email = cleanUid;
+      } else if (cleanUid.startsWith("session_anon_") && cleanUid.contains("@")) {
+        try {
+          String part = cleanUid.substring("session_anon_".length());
+          int idx = part.lastIndexOf('_');
+          email = (idx > 0) ? part.substring(0, idx) : part;
+        } catch (Exception ignored) {
+          email = cleanUid + "@farmtohome.internal";
+        }
+      } else {
+        email = cleanUid + "@farmtohome.internal";
+      }
+    }
+
     user.setFirstName(firstName);
     user.setLastName(lastName);
     user.setDisplayName(displayName);
+    user.setEmail(email);
     user.setPhoneNumber(preferred(request.phoneNumber(), user.getPhoneNumber()));
     user.setPhotoUrl(preferred(request.photoUrl(), user.getPhotoUrl()));
     user.setShoppingMode(choice(request.shoppingMode(), user.getShoppingMode(), "home", "shop"));
