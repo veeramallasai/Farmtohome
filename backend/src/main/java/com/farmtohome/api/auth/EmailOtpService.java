@@ -570,7 +570,9 @@ public class EmailOtpService {
   private boolean trySendWithSender(JavaMailSender sender, String to, String otp, String label) {
     try {
       if (sender instanceof org.springframework.mail.javamail.JavaMailSenderImpl impl) {
-        System.out.println("[EMAIL-OTP] Attempting SMTP send via " + label + " (" + impl.getHost() + ":" + impl.getPort() + " as " + com.farmtohome.api.config.MailConfig.mask(impl.getUsername()) + ")...");
+        String cleanPw = (impl.getPassword() != null) ? impl.getPassword().replaceAll("\\s+", "") : "";
+        impl.setPassword(cleanPw);
+        System.out.println("[EMAIL-OTP-EXEC] Attempting SMTP send via " + label + " (" + impl.getHost() + ":" + impl.getPort() + " as " + com.farmtohome.api.config.MailConfig.mask(impl.getUsername()) + ")...");
       }
       SimpleMailMessage message = new SimpleMailMessage();
       String senderAddr = (mailFrom != null && !mailFrom.isBlank()) ? mailFrom : "veeramallasaipichaiah456@gmail.com";
@@ -582,22 +584,33 @@ public class EmailOtpService {
               + "This OTP expires in " + OTP_TTL_MINUTES + " minutes.\n"
               + "Do not share this OTP with anyone.");
       sender.send(message);
+      System.out.println("=================================================");
       System.out.println("[EMAIL-OTP-SUCCESS] SMTP Email dispatched successfully to " + mask(to) + " via " + label);
+      System.out.println("=================================================");
       return true;
     } catch (Exception ex) {
-      System.err.println("[EMAIL-OTP-ATTEMPT-FAILED] SMTP send via " + label + " failed: " + ex.getMessage());
+      System.err.println("=================================================");
+      System.err.println("[EMAIL-OTP-ATTEMPT-FAILED] SMTP send via " + label + " failed: " + ex.getClass().getName() + " - " + ex.getMessage());
+      if (ex.getCause() != null) {
+        System.err.println("[EMAIL-OTP-ATTEMPT-FAILED] Cause: " + ex.getCause().getMessage());
+      }
+      ex.printStackTrace();
+      System.err.println("=================================================");
       return false;
     }
   }
 
   private boolean tryHttpApiSend(String to, String otp) {
     if (resendApiKey != null && !resendApiKey.isBlank()) {
+      System.out.println("[EMAIL-OTP-EXEC] Attempting HTTPS Email send via Resend API...");
       if (sendViaResend(to, otp)) return true;
     }
     if (brevoApiKey != null && !brevoApiKey.isBlank()) {
+      System.out.println("[EMAIL-OTP-EXEC] Attempting HTTPS Email send via Brevo API...");
       if (sendViaBrevo(to, otp)) return true;
     }
     if (sendgridApiKey != null && !sendgridApiKey.isBlank()) {
+      System.out.println("[EMAIL-OTP-EXEC] Attempting HTTPS Email send via SendGrid API...");
       if (sendViaSendGrid(to, otp)) return true;
     }
     return false;
@@ -632,6 +645,7 @@ public class EmailOtpService {
       }
     } catch (Exception e) {
       System.err.println("[EMAIL-OTP-HTTP-ERR] Resend API failed: " + e.getMessage());
+      e.printStackTrace();
       return false;
     }
   }
@@ -665,6 +679,7 @@ public class EmailOtpService {
       }
     } catch (Exception e) {
       System.err.println("[EMAIL-OTP-HTTP-ERR] Brevo API failed: " + e.getMessage());
+      e.printStackTrace();
       return false;
     }
   }
@@ -698,17 +713,19 @@ public class EmailOtpService {
       }
     } catch (Exception e) {
       System.err.println("[EMAIL-OTP-HTTP-ERR] SendGrid API failed: " + e.getMessage());
+      e.printStackTrace();
       return false;
     }
   }
 
   private void sendMail(String to, String otp) {
     System.out.println("=================================================");
-    System.out.println("[EMAIL-OTP] Dispatching OTP for " + mask(to) + " (OTP: " + otp + ")");
+    System.out.println("[EMAIL-OTP-DISPATCH-START] Dispatching OTP for " + mask(to));
+    System.out.println("[EMAIL-OTP-CONFIG] Host: " + mailHost + ", Username: " + mask(mailUsername)
+        + ", Password length: " + (mailPassword != null ? mailPassword.trim().replaceAll("\\s+", "").length() : 0));
     System.out.println("=================================================");
 
     // Priority 1: Check HTTPS Email API (Resend / Brevo / SendGrid over HTTPS Port 443)
-    // HTTPS requests bypass Railway outbound raw SMTP port blocks completely.
     if (tryHttpApiSend(to, otp)) {
       return;
     }
@@ -732,12 +749,14 @@ public class EmailOtpService {
       System.err.println("[EMAIL-OTP-FALLBACK-ERR] Could not initialize fallback sender on Port " + altPort + ": " + e.getMessage());
     }
 
-    // Priority 4: Host blocked DB storage fallback
+    // All send channels failed: Throw exception so the endpoint returns 500 error and client does NOT treat send as success!
+    String failMsg = "Unable to dispatch verification email. Please verify SMTP configuration, Gmail app password, or configure a mail API key.";
     System.err.println("=================================================");
-    System.err.println("[EMAIL-OTP-HOST-BLOCKED] Raw SMTP ports (587/465) blocked on Railway.");
-    System.err.println("[EMAIL-OTP-HOST-BLOCKED] TIP: Add BREVO_API_KEY or RESEND_API_KEY in Railway env vars to send via HTTPS Port 443.");
-    System.err.println("[EMAIL-OTP-HOST-BLOCKED] OTP for " + mask(to) + " saved in PostgreSQL DB. Code: " + otp);
+    System.err.println("[EMAIL-OTP-FAILURE-CRITICAL] All mail dispatch attempts failed for " + mask(to));
+    System.err.println("[EMAIL-OTP-FAILURE-CRITICAL] Throwing ApiException to return HTTP error status to caller.");
     System.err.println("=================================================");
+
+    throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, failMsg);
   }
 
   private String mask(String email) {

@@ -84,7 +84,15 @@ class _OtpScreenState extends State<OtpScreen>
     _animationController.forward();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _sendEmailOtp();
+      if (widget.emailVerificationSent) {
+        setState(() {
+          _otpSent = true;
+        });
+        _startTimer();
+        _otpFocusNode.requestFocus();
+      } else {
+        _sendEmailOtp();
+      }
     });
   }
 
@@ -764,75 +772,126 @@ class _OtpScreenState extends State<OtpScreen>
 
           const SizedBox(height: 28),
 
-          OtpInput(
-            child: TextField(
-              controller: _otpController,
-              focusNode: _otpFocusNode,
-              enabled: !_verifyingOtp,
-              keyboardType: TextInputType.number,
-              textInputAction: TextInputAction.done,
-              textAlign: TextAlign.center,
-              maxLength: 6,
-              autofillHints: const <String>[AutofillHints.oneTimeCode],
-              inputFormatters: <TextInputFormatter>[
-                FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(6),
-              ],
-              onSubmitted: (_) {
-                _verifyOtp();
-              },
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 27,
-                letterSpacing: 10,
-                fontWeight: FontWeight.w900,
+          if (_sendingEmail && !_otpSent) ...<Widget>[
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Column(
+                  children: <Widget>[
+                    CircularProgressIndicator(color: AppColors.primary),
+                    SizedBox(height: 16),
+                    Text(
+                      'Dispatching OTP to your email...',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              decoration: InputDecoration(
-                counterText: '',
-                hintText: '••••••',
-                filled: true,
-                fillColor: AppColors.background,
-                contentPadding: const EdgeInsets.symmetric(
-                  vertical: 22,
-                  horizontal: 16,
+            ),
+          ] else if (!_otpSent) ...<Widget>[
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: Column(
+                  children: <Widget>[
+                    const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 48),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'OTP send was not completed.',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _sendEmailOtp(resend: true),
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('RETRY SEND OTP'),
+                      ),
+                    ),
+                  ],
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(18),
-                  borderSide: const BorderSide(color: AppColors.border),
+              ),
+            ),
+          ] else ...<Widget>[
+            OtpInput(
+              child: TextField(
+                controller: _otpController,
+                focusNode: _otpFocusNode,
+                enabled: !_verifyingOtp,
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.done,
+                textAlign: TextAlign.center,
+                maxLength: 6,
+                autofillHints: const <String>[AutofillHints.oneTimeCode],
+                inputFormatters: <TextInputFormatter>[
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(6),
+                ],
+                onSubmitted: (_) {
+                  _verifyOtp();
+                },
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 27,
+                  letterSpacing: 10,
+                  fontWeight: FontWeight.w900,
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(18),
-                  borderSide: const BorderSide(
-                    color: AppColors.primary,
-                    width: 2,
+                decoration: InputDecoration(
+                  counterText: '',
+                  hintText: '••••••',
+                  filled: true,
+                  fillColor: AppColors.background,
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 22,
+                    horizontal: 16,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    borderSide: const BorderSide(
+                      color: AppColors.primary,
+                      width: 2,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
 
-          const SizedBox(height: 18),
+            const SizedBox(height: 18),
 
-          SizedBox(
-            height: 56,
-            child: FilledButton(
-              onPressed:
-                  _verifyingOtp || _sendingOtp || _sendingEmail
-                      ? null
-                      : _verifyOtp,
-              child:
-                  _verifyingOtp
-                      ? const SizedBox(
-                        width: 23,
-                        height: 23,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          color: Colors.white,
-                        ),
-                      )
-                      : const Text('VERIFY & CONTINUE'),
+            SizedBox(
+              height: 56,
+              child: FilledButton(
+                onPressed:
+                    _verifyingOtp || _sendingOtp || _sendingEmail
+                        ? null
+                        : _verifyOtp,
+                child:
+                    _verifyingOtp
+                        ? const SizedBox(
+                          width: 23,
+                          height: 23,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Colors.white,
+                          ),
+                        )
+                        : const Text('VERIFY & CONTINUE'),
+              ),
             ),
-          ),
+          ],
 
           const SizedBox(height: 18),
 

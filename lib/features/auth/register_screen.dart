@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../app/app_routes.dart';
+import '../../core/errors/network_exception.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/timestamp_utils.dart';
+import '../../data/repositories/email_otp_repository.dart';
 import '../../data/repositories/user_repository.dart';
 import 'widgets/password_strength.dart';
 import 'widgets/register_form.dart';
@@ -243,14 +245,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
         phoneNumber: phone,
       );
 
+      // Attempt to send OTP email BEFORE navigating to OTP screen
+      final emailOtpRepo = EmailOtpRepository();
+      final Map<String, dynamic> otpRes = await emailOtpRepo.requestOtp(email);
+      final bool alreadyVerified = otpRes['alreadyVerified'] == true;
+
       if (!mounted) return;
+
+      if (alreadyVerified) {
+        _showMessage('Email is already verified.');
+        Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+        return;
+      }
 
       Navigator.of(context).pushReplacementNamed(
         AppRoutes.otp,
         arguments: <String, dynamic>{
           'phoneNumber': phone,
           'email': email,
-          'emailVerificationSent': false,
+          'emailVerificationSent': true,
           'userId': refreshedUser.uid,
           'source': 'register-email-only',
         },
@@ -265,10 +278,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       if (!mounted) return;
 
-      _showMessage(
-        'Account was created, but setup could not finish. '
-        'Please press Create Account again with the same email and password.',
-      );
+      String message = 'Account was created, but OTP email could not be sent. Please check your internet connection or email address and try again.';
+      if (error is NetworkException && error.message.trim().isNotEmpty) {
+        message = error.message.trim();
+      }
+
+      _showMessage(message);
     } finally {
       if (mounted) {
         setState(() {

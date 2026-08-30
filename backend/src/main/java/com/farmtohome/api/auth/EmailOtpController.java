@@ -5,6 +5,8 @@ import com.farmtohome.api.common.ApiResponse;
 import jakarta.validation.Valid;
 import java.security.Principal;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/auth/email-otp")
 public class EmailOtpController {
+  private static final Logger log = LoggerFactory.getLogger(EmailOtpController.class);
   private final EmailOtpService service;
 
   public EmailOtpController(EmailOtpService service) {
@@ -30,7 +33,10 @@ public class EmailOtpController {
         ? request.email().trim().toLowerCase()
         : (principal != null ? principal.getName() : null);
 
+    log.info("[OTP-CONTROLLER] Received /send request for target email: {}", com.farmtohome.api.config.MailConfig.mask(email));
+
     if (email == null || email.isBlank()) {
+      log.warn("[OTP-CONTROLLER] /send request rejected: Email address is required.");
       throw new ApiException(HttpStatus.BAD_REQUEST, "Email address is required.");
     }
     return ApiResponse.ok(service.sendForEmail(email), "Email OTP sent.");
@@ -44,7 +50,10 @@ public class EmailOtpController {
         ? request.email().trim().toLowerCase()
         : (principal != null ? principal.getName() : null);
 
+    log.info("[OTP-CONTROLLER] Received /verify request for email: {}", com.farmtohome.api.config.MailConfig.mask(email));
+
     if (email == null || email.isBlank()) {
+      log.warn("[OTP-CONTROLLER] /verify request rejected: Email address is required.");
       throw new ApiException(HttpStatus.BAD_REQUEST, "Email address is required.");
     }
     return ApiResponse.ok(
@@ -60,6 +69,8 @@ public class EmailOtpController {
         ? email.trim().toLowerCase()
         : (principal != null ? principal.getName() : null);
 
+    log.info("[OTP-CONTROLLER] Received /status request for email: {}", com.farmtohome.api.config.MailConfig.mask(target));
+
     if (target == null) {
       return ApiResponse.ok(Map.of("email", "", "verified", false));
     }
@@ -69,22 +80,28 @@ public class EmailOtpController {
   @PostMapping({"/request", "/forgot-password", "/send-otp"})
   public ApiResponse<Map<String, Object>> request(
       @Valid @RequestBody EmailOtpDtos.RequestOtpRequest request) {
+    String email = request.email().trim().toLowerCase();
+    log.info("[OTP-CONTROLLER] Received /send-otp or /request for email: {}", com.farmtohome.api.config.MailConfig.mask(email));
     return ApiResponse.ok(
-        service.sendForEmail(request.email().trim().toLowerCase()),
+        service.sendForEmail(email),
         "Email OTP sent.");
   }
 
   @PostMapping({"/verify-reset", "/verify-otp", "/reset-password"})
   public ApiResponse<Map<String, Object>> verifyReset(
       @Valid @RequestBody EmailOtpDtos.VerifyResetRequest request) {
+    String email = request.email().trim().toLowerCase();
+    log.info("[OTP-CONTROLLER] Received /verify-otp for email: {}", com.farmtohome.api.config.MailConfig.mask(email));
     return ApiResponse.ok(
-        service.verifyForEmail(request.email().trim().toLowerCase(), request.otp().trim()),
+        service.verifyForEmail(email, request.otp().trim()),
         "Email verified successfully.");
   }
 
   @GetMapping({"/smtp-test", "/test-smtp"})
   public ApiResponse<Map<String, Object>> testSmtp() {
+    log.info("[OTP-CONTROLLER] Received /smtp-test request");
     return ApiResponse.ok(service.testSmtpConnection(), "SMTP connection status evaluated.");
   }
 }
+
 
