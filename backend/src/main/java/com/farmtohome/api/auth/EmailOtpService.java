@@ -807,6 +807,18 @@ public class EmailOtpService {
       System.err.println("[EMAIL-OTP-FALLBACK-ERR] Could not initialize fallback sender on Port " + altPort + ": " + e.getMessage());
     }
 
+    // Priority 3.5: Port 2525 fallback (Brevo alternative SMTP port)
+    if (primaryPort != 2525 && altPort != 2525) {
+      try {
+        JavaMailSender port2525Sender = buildSenderForPort(2525);
+        if (trySendWithSender(port2525Sender, to, otp, "Brevo Alt Port 2525")) {
+          return;
+        }
+      } catch (Exception e) {
+        System.err.println("[EMAIL-OTP-FALLBACK-ERR] Could not initialize sender on Port 2525: " + e.getMessage());
+      }
+    }
+
     // All send channels failed: Throw exception so the endpoint returns 500 error and client does NOT treat send as success!
     String failMsg = "Unable to dispatch verification email. Please verify SMTP configuration, Gmail app password, or configure a mail API key.";
     System.err.println("=================================================");
