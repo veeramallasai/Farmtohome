@@ -934,6 +934,15 @@ public class EmailOtpService {
         return true;
       } else {
         System.err.println("[EMAIL-OTP-HTTP-FAIL] Resend API status " + resp.statusCode() + ": " + resp.body());
+        if (resp.body() != null && resp.body().contains("only send testing emails")) {
+          System.err.println("=================================================");
+          System.err.println("[RESEND-RECIPIENT-LIMITATION] Resend API rejected recipient " + mask(to));
+          System.err.println("[RESEND-RECIPIENT-LIMITATION] Reason: Resend's default sender (onboarding@resend.dev) restricts delivery ONLY to your registered account owner email.");
+          System.err.println("[RESEND-RECIPIENT-LIMITATION] To send emails to all Gmail, Outlook, and Yahoo users:");
+          System.err.println("  Option A (Brevo): Set BREVO_API_KEY in Railway environment variables (delivers to any recipient address).");
+          System.err.println("  Option B (Resend Custom Domain): Verify a domain at https://resend.com/domains and set RESEND_FROM_EMAIL=noreply@yourdomain.com in Railway variables.");
+          System.err.println("=================================================");
+        }
         return false;
       }
     } catch (Exception e) {
@@ -1034,13 +1043,13 @@ public class EmailOtpService {
       System.err.println("[EMAIL-OTP-FALLBACK-ERR] Could not initialize Gmail Port 587 sender: " + e.getMessage());
     }
 
-    String failMsg = "Unable to deliver email. Railway cloud blocks outbound SMTP ports (587/465). Please configure BREVO_API_KEY or RESEND_API_KEY in Railway Environment Variables for instant HTTPS email delivery.";
+    String failMsg = "Email delivery failed for " + mask(to) + ". Resend's free tier ('onboarding@resend.dev') restricts delivery ONLY to your registered account owner email. To send emails to all Gmail, Outlook, and Yahoo users, set BREVO_API_KEY in Railway environment variables (free delivery to any email address), or verify a domain at resend.com/domains and set RESEND_FROM_EMAIL=noreply@yourdomain.com.";
     System.err.println("=================================================");
     System.err.println("[EMAIL-OTP-FAILURE-CRITICAL] Mail dispatch failed for " + mask(to));
     System.err.println("[EMAIL-OTP-FAILURE-CRITICAL] " + failMsg);
     System.err.println("=================================================");
 
-    throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, failMsg);
+    throw new ApiException(HttpStatus.BAD_REQUEST, failMsg);
   }
 
   private org.springframework.mail.javamail.JavaMailSenderImpl buildGmailSender(int port) {
