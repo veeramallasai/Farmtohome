@@ -982,60 +982,19 @@ public class EmailOtpService {
 
   private void sendMail(String to, String otp) {
     System.out.println("=================================================");
-    System.out.println("[EMAIL-OTP-DISPATCH-START] Dispatching OTP for " + mask(to) + " via Resend HTTPS API (Port 443)...");
+    System.out.println("[EMAIL-OTP-DISPATCH-START] Dispatching OTP for " + mask(to) + " via SendGrid HTTPS API (Port 443)...");
     System.out.println("=================================================");
 
-    // Priority 1: Primary Method - Resend HTTPS API (HTTPS Port 443 - zero SMTP port blocks)
-    String resendKey = resolveResendApiKey();
-    if (!resendKey.isBlank()) {
-      System.out.println("[EMAIL-OTP-EXEC] Primary Method: Sending via Resend HTTPS API...");
-      if (sendViaResend(to, otp, resendKey)) {
+    String sgKey = resolveSendGridApiKey();
+    if (!sgKey.isBlank()) {
+      System.out.println("[EMAIL-OTP-EXEC] Sending via SendGrid HTTPS API...");
+      if (sendViaSendGrid(to, otp, sgKey)) {
+        System.out.println("[EMAIL-OTP-SUCCESS] OTP email sent via SendGrid for " + mask(to));
         return;
       }
     } else {
-      System.out.println("[EMAIL-OTP-INFO] RESEND_API_KEY environment variable is not configured. Checking other HTTPS API / SMTP fallbacks...");
+      System.out.println("[EMAIL-OTP-WARN] SENDGRID_API_KEY environment variable is not configured. Please configure it in Railway to enable email delivery.");
     }
-
-    // Priority 2: Secondary Method - SendGrid HTTPS API
-    String sgKey = resolveSendGridApiKey();
-    if (!sgKey.isBlank()) {
-      System.out.println("[EMAIL-OTP-EXEC] Secondary Method: Sending via SendGrid HTTPS API...");
-      if (sendViaSendGrid(to, otp, sgKey)) {
-        return;
-      }
-    }
-
-    // Priority 3: SMTP Fallback (Port 465 SSL / 587)
-    int primaryPort = 465;
-    try { primaryPort = Integer.parseInt(mailPortStr.trim()); } catch (Exception ignored) {}
-
-    if (trySendWithSender(mailSender, to, otp, "Primary Sender (Port " + primaryPort + ")")) {
-      return;
-    }
-
-    try {
-      JavaMailSender gmail465 = buildGmailSender(465);
-      if (trySendWithSender(gmail465, to, otp, "Gmail SMTP (Port 465 SSL)")) {
-        return;
-      }
-    } catch (Exception e) {
-      System.err.println("[EMAIL-OTP-FALLBACK-ERR] Could not initialize Gmail Port 465 sender: " + e.getMessage());
-    }
-
-    try {
-      JavaMailSender gmail587 = buildGmailSender(587);
-      if (trySendWithSender(gmail587, to, otp, "Gmail SMTP (Port 587 STARTTLS)")) {
-        return;
-      }
-    } catch (Exception e) {
-      System.err.println("[EMAIL-OTP-FALLBACK-ERR] Could not initialize Gmail Port 587 sender: " + e.getMessage());
-    }
-
-    // All live dispatch channels restricted or unavailable (e.g. Resend free tier testing restriction on non-owner emails or Railway SMTP port blocks)
-    System.out.println("=================================================");
-    System.out.println("[EMAIL-OTP-NOTICE] External mail dispatch restricted or unavailable for " + mask(to) + ".");
-    System.out.println("[EMAIL-OTP-NOTICE] OTP generated and returned in API response data for verification.");
-    System.out.println("=================================================");
   }
 
   private org.springframework.mail.javamail.JavaMailSenderImpl buildGmailSender(int port) {
