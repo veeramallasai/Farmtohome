@@ -982,40 +982,69 @@ public class EmailOtpService {
 
   private void sendMail(String to, String otp) {
     System.out.println("=================================================");
-    System.out.println("[EMAIL-OTP-DISPATCH-START] Dispatching OTP for " + mask(to) + " via Resend HTTPS API (Port 443)...");
+    System.out.println("[EMAIL-OTP-DISPATCH-START] Dispatching OTP for " + mask(to) + "...");
     System.out.println("=================================================");
 
-    // Priority 1: Primary Method - Resend HTTPS API (HTTPS Port 443 - zero SMTP port blocks)
+    // Railway's Free/Hobby plans block outbound SMTP ports (25/465/587), so HTTPS-based
+    // transactional email APIs (Resend, SendGrid) are strongly preferred over Gmail SMTP.
+    // Resend is tried first (generous free tier + high deliverability), then SendGrid,
+    // and Gmail SMTP is only attempted as a last resort when neither HTTPS provider is configured.
     String resendKey = resolveResendApiKey();
-    if (!resendKey.isBlank()) {
-      System.out.println("[EMAIL-OTP-EXEC] Primary Method: Sending via Resend HTTPS API...");
-      if (sendViaResend(to, otp, resendKey)) {
-        return;
-      }
-    } else {
-      System.out.println("[EMAIL-OTP-INFO] RESEND_API_KEY environment variable is not configured. Checking other HTTPS API / SMTP fallbacks...");
-    }
-
-    // Priority 2: Secondary Method - SendGrid HTTPS API
     String sgKey = resolveSendGridApiKey();
-    if (!sgKey.isBlank()) {
-      System.out.println("[EMAIL-OTP-EXEC] Secondary Method: Sending via SendGrid HTTPS API...");
-      if (sendViaSendGrid(to, otp, sgKey)) {
+    boolean httpsProviderConfigured = !resendKey.isBlank() || !sgKey.isBlank();
+
+    // Priority 1: Resend HTTPS API (preferred provider)
+    if (!resendKey.isBlank()) {
+      System.out.println("[EMAIL-OTP-PROVIDER] Using Resend (HTTPS API, Port 443) as the primary email provider for " + mask(to));
+      if (sendViaResend(to, otp, resendKey)) {
+        System.out.println("[EMAIL-OTP-PROVIDER-USED] Resend");
         return;
       }
+      System.err.println("[EMAIL-OTP-PROVIDER-FAILED] Resend send failed for " + mask(to) + ". Falling back to next provider...");
+    } else {
+      System.out.println("[EMAIL-OTP-INFO] RESEND_API_KEY is not configured. Checking SendGrid...");
     }
 
-    // Priority 3: SMTP Fallback (Port 465 SSL / 587)
+    // Priority 2: SendGrid HTTPS API (used only if Resend is not configured or failed)
+    if (!sgKey.isBlank()) {
+      System.out.println("[EMAIL-OTP-PROVIDER] Using SendGrid (HTTPS API, Port 443) as the email provider for " + mask(to));
+      if (sendViaSendGrid(to, otp, sgKey)) {
+        System.out.println("[EMAIL-OTP-PROVIDER-USED] SendGrid");
+        return;
+      }
+      System.err.println("[EMAIL-OTP-PROVIDER-FAILED] SendGrid send failed for " + mask(to) + ".");
+    } else if (resendKey.isBlank()) {
+      System.out.println("[EMAIL-OTP-INFO] SENDGRID_API_KEY is not configured either.");
+    }
+
+    // Priority 3: Gmail SMTP - last resort only. On Railway Free/Hobby plans SMTP ports
+    // are blocked, so this is skipped entirely whenever an HTTPS provider is configured
+    // (Resend/SendGrid), even if that provider's send attempt failed above.
+    if (httpsProviderConfigured) {
+      System.out.println("=================================================");
+      System.out.println("[EMAIL-OTP-PROVIDER-SKIP] Skipping Gmail SMTP fallback because an HTTPS email provider "
+          + "(Resend/SendGrid) is configured. SMTP ports are blocked on Railway Free/Hobby plans.");
+      System.out.println("[EMAIL-OTP-NOTICE] All configured HTTPS providers failed to deliver to " + mask(to) + ".");
+      System.out.println("[EMAIL-OTP-NOTICE] OTP generated and returned in API response data for verification.");
+      System.out.println("=================================================");
+      return;
+    }
+
+    System.out.println("[EMAIL-OTP-PROVIDER] No HTTPS email provider configured. Attempting Gmail SMTP as last resort "
+        + "(note: SMTP ports are typically blocked on Railway Free/Hobby plans)...");
+
     int primaryPort = 465;
     try { primaryPort = Integer.parseInt(mailPortStr.trim()); } catch (Exception ignored) {}
 
     if (trySendWithSender(mailSender, to, otp, "Primary Sender (Port " + primaryPort + ")")) {
+      System.out.println("[EMAIL-OTP-PROVIDER-USED] Gmail SMTP (Primary Sender, Port " + primaryPort + ")");
       return;
     }
 
     try {
       JavaMailSender gmail465 = buildGmailSender(465);
       if (trySendWithSender(gmail465, to, otp, "Gmail SMTP (Port 465 SSL)")) {
+        System.out.println("[EMAIL-OTP-PROVIDER-USED] Gmail SMTP (Port 465 SSL)");
         return;
       }
     } catch (Exception e) {
@@ -1025,6 +1054,7 @@ public class EmailOtpService {
     try {
       JavaMailSender gmail587 = buildGmailSender(587);
       if (trySendWithSender(gmail587, to, otp, "Gmail SMTP (Port 587 STARTTLS)")) {
+        System.out.println("[EMAIL-OTP-PROVIDER-USED] Gmail SMTP (Port 587 STARTTLS)");
         return;
       }
     } catch (Exception e) {
