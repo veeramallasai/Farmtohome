@@ -724,25 +724,15 @@ public class EmailOtpService {
     System.out.println("[EMAIL-OTP-DISPATCH-START] Dispatching OTP via Gmail SMTP for " + mask(to));
     System.out.println("=================================================");
 
-    int primaryPort = 587;
+    int primaryPort = 465;
     try { primaryPort = Integer.parseInt(mailPortStr.trim()); } catch (Exception ignored) {}
 
-    // Priority 1: Primary JavaMailSender SMTP (Port 587 STARTTLS)
+    // Priority 1: Primary JavaMailSender SMTP (Port 465 SSL / 587)
     if (trySendWithSender(mailSender, to, otp, "Primary Sender (Port " + primaryPort + ")")) {
       return;
     }
 
-    // Priority 2: Gmail SMTP Port 587 STARTTLS Sender
-    try {
-      JavaMailSender gmail587 = buildGmailSender(587);
-      if (trySendWithSender(gmail587, to, otp, "Gmail SMTP (Port 587 STARTTLS)")) {
-        return;
-      }
-    } catch (Exception e) {
-      System.err.println("[EMAIL-OTP-FALLBACK-ERR] Could not initialize Gmail Port 587 sender: " + e.getMessage());
-    }
-
-    // Priority 3: Gmail SMTP Port 465 SSL Fallback Sender
+    // Priority 2: Gmail SMTP Port 465 SSL Sender (unblocked on Railway)
     try {
       JavaMailSender gmail465 = buildGmailSender(465);
       if (trySendWithSender(gmail465, to, otp, "Gmail SMTP (Port 465 SSL)")) {
@@ -750,6 +740,16 @@ public class EmailOtpService {
       }
     } catch (Exception e) {
       System.err.println("[EMAIL-OTP-FALLBACK-ERR] Could not initialize Gmail Port 465 sender: " + e.getMessage());
+    }
+
+    // Priority 3: Gmail SMTP Port 587 STARTTLS Fallback Sender
+    try {
+      JavaMailSender gmail587 = buildGmailSender(587);
+      if (trySendWithSender(gmail587, to, otp, "Gmail SMTP (Port 587 STARTTLS)")) {
+        return;
+      }
+    } catch (Exception e) {
+      System.err.println("[EMAIL-OTP-FALLBACK-ERR] Could not initialize Gmail Port 587 sender: " + e.getMessage());
     }
 
     // Priority 4: Check HTTPS Email API (Resend / SendGrid if configured)
@@ -782,9 +782,9 @@ public class EmailOtpService {
     props.put("mail.smtp.auth", "true");
     props.put("mail.smtp.ssl.trust", "*");
     props.put("mail.smtp.ssl.protocols", "TLSv1.2 TLSv1.3");
-    props.put("mail.smtp.connectiontimeout", "4000");
-    props.put("mail.smtp.timeout", "4000");
-    props.put("mail.smtp.writetimeout", "4000");
+    props.put("mail.smtp.connectiontimeout", "10000");
+    props.put("mail.smtp.timeout", "10000");
+    props.put("mail.smtp.writetimeout", "10000");
 
     if (port == 465) {
       props.put("mail.smtp.ssl.enable", "true");
