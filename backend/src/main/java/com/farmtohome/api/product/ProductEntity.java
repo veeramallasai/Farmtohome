@@ -82,4 +82,6 @@ public class ProductEntity {
   public Instant getUpdatedAt() { return updatedAt; }
   public void setStockQuantity(int stockQuantity) { this.stockQuantity = stockQuantity; }
   public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+  public void setRating(BigDecimal rating) { this.rating = rating; }
+  public void setReviewCount(int reviewCount) { this.reviewCount = reviewCount; }
 }
