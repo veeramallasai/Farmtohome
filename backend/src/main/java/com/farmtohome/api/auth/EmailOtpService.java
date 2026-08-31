@@ -34,6 +34,7 @@ public class EmailOtpService {
   private final String mailUsername;
   private final String mailPassword;
   private final String resendApiKey;
+  private final String resendFromEmail;
   private final String sendgridApiKey;
   private final java.net.http.HttpClient httpClient = java.net.http.HttpClient.newBuilder()
       .connectTimeout(java.time.Duration.ofSeconds(10))
@@ -48,6 +49,7 @@ public class EmailOtpService {
       @Value("${spring.mail.username:${SPRING_MAIL_USERNAME:${MAIL_USERNAME:${APP_MAIL_FROM:${MAIL_FROM:veeramallasaipichaiah456@gmail.com}}}}}") String mailUsername,
       @Value("${spring.mail.password:${SPRING_MAIL_PASSWORD:${MAIL_PASSWORD:hinnvjmxxziliiim}}}") String mailPassword,
       @Value("${RESEND_API_KEY:${MAIL_RESEND_API_KEY:}}") String resendApiKey,
+      @Value("${RESEND_FROM_EMAIL:${MAIL_RESEND_FROM_EMAIL:${app.resend-from-email:onboarding@resend.dev}}}") String resendFromEmail,
       @Value("${SENDGRID_API_KEY:${MAIL_SENDGRID_API_KEY:}}") String sendgridApiKey) {
     this.jdbc = jdbc;
     this.mailSender = mailSender;
@@ -57,6 +59,7 @@ public class EmailOtpService {
     this.mailUsername = mailUsername;
     this.mailPassword = mailPassword;
     this.resendApiKey = resendApiKey;
+    this.resendFromEmail = resendFromEmail;
     this.sendgridApiKey = sendgridApiKey;
   }
 
@@ -603,6 +606,14 @@ public class EmailOtpService {
     if (resendApiKey != null && !resendApiKey.isBlank()) {
       return resendApiKey.trim();
     }
+    String envKey = System.getenv("RESEND_API_KEY");
+    if (envKey != null && !envKey.isBlank()) {
+      return envKey.trim();
+    }
+    envKey = System.getenv("MAIL_RESEND_API_KEY");
+    if (envKey != null && !envKey.isBlank()) {
+      return envKey.trim();
+    }
     String cleanPw = (mailPassword != null) ? mailPassword.trim().replaceAll("\\s+", "") : "";
     if (cleanPw.startsWith("re_")) {
       return cleanPw;
@@ -617,11 +628,12 @@ public class EmailOtpService {
     if (sendgridApiKey != null && !sendgridApiKey.isBlank()) {
       return sendgridApiKey.trim();
     }
+    String envKey = System.getenv("SENDGRID_API_KEY");
+    if (envKey != null && !envKey.isBlank()) {
+      return envKey.trim();
+    }
     String cleanPw = (mailPassword != null) ? mailPassword.trim().replaceAll("\\s+", "") : "";
     if (cleanPw.startsWith("SG.")) {
-      return cleanPw;
-    }
-    if (mailHost != null && mailHost.contains("sendgrid") && !cleanPw.isBlank()) {
       return cleanPw;
     }
     return "";
@@ -635,6 +647,32 @@ public class EmailOtpService {
       return mailUsername.trim();
     }
     return "veeramallasaipichaiah456@gmail.com";
+  }
+
+  private String resolveResendFromAddress() {
+    if (resendFromEmail != null && !resendFromEmail.isBlank() && resendFromEmail.contains("@")) {
+      String clean = resendFromEmail.trim();
+      String lower = clean.toLowerCase();
+      if (!lower.endsWith("@gmail.com") && !lower.endsWith("@yahoo.com") && !lower.endsWith("@outlook.com") && !lower.endsWith("@hotmail.com")) {
+        return clean;
+      }
+    }
+    String envFrom = System.getenv("RESEND_FROM_EMAIL");
+    if (envFrom != null && !envFrom.isBlank() && envFrom.contains("@")) {
+      String clean = envFrom.trim();
+      String lower = clean.toLowerCase();
+      if (!lower.endsWith("@gmail.com") && !lower.endsWith("@yahoo.com") && !lower.endsWith("@outlook.com") && !lower.endsWith("@hotmail.com")) {
+        return clean;
+      }
+    }
+    if (mailFrom != null && !mailFrom.isBlank() && mailFrom.contains("@")) {
+      String clean = mailFrom.trim();
+      String lower = clean.toLowerCase();
+      if (!lower.endsWith("@gmail.com") && !lower.endsWith("@yahoo.com") && !lower.endsWith("@outlook.com") && !lower.endsWith("@hotmail.com")) {
+        return clean;
+      }
+    }
+    return "onboarding@resend.dev";
   }
 
   private boolean tryHttpApiSend(String to, String otp) {
@@ -653,7 +691,23 @@ public class EmailOtpService {
 
   private boolean sendViaResend(String to, String otp, String key) {
     try {
-      String fromAddr = resolveFromAddress();
+      String fromAddr = resolveResendFromAddress();
+      System.out.println("[EMAIL-OTP-RESEND] Attempting Resend dispatch with sender domain: " + fromAddr);
+      boolean success = doResendPost(fromAddr, to, otp, key);
+      if (!success && !fromAddr.equalsIgnoreCase("onboarding@resend.dev")) {
+        System.out.println("[EMAIL-OTP-RESEND] Custom domain sender (" + fromAddr + ") failed. Retrying via Resend default sender onboarding@resend.dev...");
+        success = doResendPost("onboarding@resend.dev", to, otp, key);
+      }
+      return success;
+    } catch (Exception e) {
+      System.err.println("[EMAIL-OTP-HTTP-ERR] Resend API failed: " + e.getMessage());
+      e.printStackTrace();
+      return false;
+    }
+  }
+
+  private boolean doResendPost(String fromAddr, String to, String otp, String key) {
+    try {
       String body = """
           {
             "from": "%s",
@@ -672,15 +726,14 @@ public class EmailOtpService {
 
       java.net.http.HttpResponse<String> resp = httpClient.send(req, java.net.http.HttpResponse.BodyHandlers.ofString());
       if (resp.statusCode() >= 200 && resp.statusCode() < 300) {
-        System.out.println("[EMAIL-OTP-HTTP-SUCCESS] Sent OTP to " + mask(to) + " via Resend API (HTTPS Port 443)");
+        System.out.println("[EMAIL-OTP-HTTP-SUCCESS] Sent OTP to " + mask(to) + " via Resend API (HTTPS Port 443, from: " + fromAddr + ")");
         return true;
       } else {
         System.err.println("[EMAIL-OTP-HTTP-FAIL] Resend API status " + resp.statusCode() + ": " + resp.body());
         return false;
       }
     } catch (Exception e) {
-      System.err.println("[EMAIL-OTP-HTTP-ERR] Resend API failed: " + e.getMessage());
-      e.printStackTrace();
+      System.err.println("[EMAIL-OTP-HTTP-ERR] Resend POST failed: " + e.getMessage());
       return false;
     }
   }
@@ -721,18 +774,37 @@ public class EmailOtpService {
 
   private void sendMail(String to, String otp) {
     System.out.println("=================================================");
-    System.out.println("[EMAIL-OTP-DISPATCH-START] Dispatching OTP via Gmail SMTP for " + mask(to));
+    System.out.println("[EMAIL-OTP-DISPATCH-START] Dispatching OTP for " + mask(to) + " via Resend HTTPS API (Port 443)...");
     System.out.println("=================================================");
 
+    // Priority 1: Primary Method - Resend HTTPS API (HTTPS Port 443 - zero SMTP port blocks)
+    String resendKey = resolveResendApiKey();
+    if (!resendKey.isBlank()) {
+      System.out.println("[EMAIL-OTP-EXEC] Primary Method: Sending via Resend HTTPS API...");
+      if (sendViaResend(to, otp, resendKey)) {
+        return;
+      }
+    } else {
+      System.out.println("[EMAIL-OTP-INFO] RESEND_API_KEY environment variable is not configured. Checking other HTTPS API / SMTP fallbacks...");
+    }
+
+    // Priority 2: Secondary Method - SendGrid HTTPS API
+    String sgKey = resolveSendGridApiKey();
+    if (!sgKey.isBlank()) {
+      System.out.println("[EMAIL-OTP-EXEC] Secondary Method: Sending via SendGrid HTTPS API...");
+      if (sendViaSendGrid(to, otp, sgKey)) {
+        return;
+      }
+    }
+
+    // Priority 3: SMTP Fallback (Port 465 SSL / 587)
     int primaryPort = 465;
     try { primaryPort = Integer.parseInt(mailPortStr.trim()); } catch (Exception ignored) {}
 
-    // Priority 1: Primary JavaMailSender SMTP (Port 465 SSL / 587)
     if (trySendWithSender(mailSender, to, otp, "Primary Sender (Port " + primaryPort + ")")) {
       return;
     }
 
-    // Priority 2: Gmail SMTP Port 465 SSL Sender (unblocked on Railway)
     try {
       JavaMailSender gmail465 = buildGmailSender(465);
       if (trySendWithSender(gmail465, to, otp, "Gmail SMTP (Port 465 SSL)")) {
@@ -742,7 +814,6 @@ public class EmailOtpService {
       System.err.println("[EMAIL-OTP-FALLBACK-ERR] Could not initialize Gmail Port 465 sender: " + e.getMessage());
     }
 
-    // Priority 3: Gmail SMTP Port 587 STARTTLS Fallback Sender
     try {
       JavaMailSender gmail587 = buildGmailSender(587);
       if (trySendWithSender(gmail587, to, otp, "Gmail SMTP (Port 587 STARTTLS)")) {
@@ -752,16 +823,11 @@ public class EmailOtpService {
       System.err.println("[EMAIL-OTP-FALLBACK-ERR] Could not initialize Gmail Port 587 sender: " + e.getMessage());
     }
 
-    // Priority 4: Check HTTPS Email API (Resend / SendGrid if configured)
-    if (tryHttpApiSend(to, otp)) {
-      return;
-    }
-
-    // All send channels failed: Throw exception so the endpoint returns 500 error and client does NOT treat send as success!
-    String failMsg = "Unable to dispatch verification email. Please verify Gmail app password or network access.";
+    // All send channels failed: Throw exception with clear diagnostic message for Railway cloud environment
+    String failMsg = "Unable to dispatch email. Outbound SMTP ports are blocked on Railway. Please configure RESEND_API_KEY in your Railway environment variables for instant HTTPS email delivery.";
     System.err.println("=================================================");
-    System.err.println("[EMAIL-OTP-FAILURE-CRITICAL] All mail dispatch attempts failed for " + mask(to));
-    System.err.println("[EMAIL-OTP-FAILURE-CRITICAL] Throwing ApiException to return HTTP error status to caller.");
+    System.err.println("[EMAIL-OTP-FAILURE-CRITICAL] Mail dispatch failed for " + mask(to));
+    System.err.println("[EMAIL-OTP-FAILURE-CRITICAL] " + failMsg);
     System.err.println("=================================================");
 
     throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, failMsg);
@@ -782,9 +848,9 @@ public class EmailOtpService {
     props.put("mail.smtp.auth", "true");
     props.put("mail.smtp.ssl.trust", "*");
     props.put("mail.smtp.ssl.protocols", "TLSv1.2 TLSv1.3");
-    props.put("mail.smtp.connectiontimeout", "10000");
-    props.put("mail.smtp.timeout", "10000");
-    props.put("mail.smtp.writetimeout", "10000");
+    props.put("mail.smtp.connectiontimeout", "3000");
+    props.put("mail.smtp.timeout", "3000");
+    props.put("mail.smtp.writetimeout", "3000");
 
     if (port == 465) {
       props.put("mail.smtp.ssl.enable", "true");

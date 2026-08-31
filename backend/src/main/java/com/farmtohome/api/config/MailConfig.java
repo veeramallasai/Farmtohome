@@ -47,9 +47,9 @@ public class MailConfig {
     props.put("mail.smtp.auth", "true");
     props.put("mail.smtp.ssl.trust", "*");
     props.put("mail.smtp.ssl.protocols", "TLSv1.2 TLSv1.3");
-    props.put("mail.smtp.connectiontimeout", "10000");
-    props.put("mail.smtp.timeout", "10000");
-    props.put("mail.smtp.writetimeout", "10000");
+    props.put("mail.smtp.connectiontimeout", "3000");
+    props.put("mail.smtp.timeout", "3000");
+    props.put("mail.smtp.writetimeout", "3000");
 
     String securityMode;
     if (port == 465) {
