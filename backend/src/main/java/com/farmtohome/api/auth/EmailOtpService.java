@@ -806,11 +806,26 @@ public class EmailOtpService {
     return "onboarding@resend.dev";
   }
 
+  private String resolveBrevoApiKey() {
+    String envKey = System.getenv("BREVO_API_KEY");
+    if (envKey != null && !envKey.isBlank()) return envKey.trim();
+    envKey = System.getenv("MAIL_BREVO_API_KEY");
+    if (envKey != null && !envKey.isBlank()) return envKey.trim();
+    String cleanPw = (mailPassword != null) ? mailPassword.trim().replaceAll("\\s+", "") : "";
+    if (cleanPw.startsWith("xkeysib-")) return cleanPw;
+    return "";
+  }
+
   private boolean tryHttpApiSend(String to, String otp) {
     String resendKey = resolveResendApiKey();
     if (!resendKey.isBlank()) {
       System.out.println("[EMAIL-OTP-EXEC] Attempting HTTPS Email send via Resend API (HTTPS Port 443)...");
       if (sendViaResend(to, otp, resendKey)) return true;
+    }
+    String brevoKey = resolveBrevoApiKey();
+    if (!brevoKey.isBlank()) {
+      System.out.println("[EMAIL-OTP-EXEC] Attempting HTTPS Email send via Brevo REST API (HTTPS Port 443)...");
+      if (sendViaBrevo(to, otp, brevoKey)) return true;
     }
     String sgKey = resolveSendGridApiKey();
     if (!sgKey.isBlank()) {
@@ -820,10 +835,44 @@ public class EmailOtpService {
     return false;
   }
 
+  private boolean sendViaBrevo(String to, String otp, String key) {
+    try {
+      String fromAddr = resolveFromAddress();
+      if (!fromAddr.contains("@")) fromAddr = "noreply@farmtohome.com";
+      String body = """
+          {
+            "sender": {"name": "Farm To Home", "email": "%s"},
+            "to": [{"email": "%s"}],
+            "subject": "Farm To Home - Email Verification OTP",
+            "textContent": "Your Farm To Home verification OTP is: %s\\n\\nThis OTP expires in %d minutes.\\nDo not share this OTP with anyone."
+          }
+          """.formatted(fromAddr, to, otp, OTP_TTL_MINUTES);
+
+      java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
+          .uri(java.net.URI.create("https://api.brevo.com/v3/smtp/email"))
+          .header("api-key", key.trim())
+          .header("Content-Type", "application/json")
+          .POST(java.net.http.HttpRequest.BodyPublishers.ofString(body))
+          .build();
+
+      java.net.http.HttpResponse<String> resp = httpClient.send(req, java.net.http.HttpResponse.BodyHandlers.ofString());
+      if (resp.statusCode() >= 200 && resp.statusCode() < 300) {
+        System.out.println("[EMAIL-OTP-HTTP-SUCCESS] Sent OTP to " + mask(to) + " via Brevo REST API (HTTPS Port 443)");
+        return true;
+      } else {
+        System.err.println("[EMAIL-OTP-HTTP-FAIL] Brevo REST API status " + resp.statusCode() + ": " + resp.body());
+        return false;
+      }
+    } catch (Exception e) {
+      System.err.println("[EMAIL-OTP-HTTP-ERR] Brevo REST API failed: " + e.getMessage());
+      return false;
+    }
+  }
+
   private boolean sendViaResend(String to, String otp, String key) {
     try {
       String fromAddr = resolveResendFromAddress();
-      System.out.println("[EMAIL-OTP-RESEND] Attempting Resend dispatch with sender domain: " + fromAddr);
+      System.out.println("[EMAIL-OTP-RESEND] Attempting Resend dispatch to " + mask(to) + " with sender: " + fromAddr);
       boolean success = doResendPost(fromAddr, to, otp, key);
       if (!success && !fromAddr.equalsIgnoreCase("onboarding@resend.dev")) {
         System.out.println("[EMAIL-OTP-RESEND] Custom domain sender (" + fromAddr + ") failed. Retrying via Resend default sender onboarding@resend.dev...");
