@@ -79,8 +79,8 @@ public class AuthController {
 
     String uid = existingOpt.map(AppUserEntity::getFirebaseUid)
         .orElseGet(() -> "usr_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16));
-    String name = ((request.firstName() != null ? request.firstName() : "") + " " + (request.lastName() != null ? request.lastName() : "")).trim();
-    if (name.isEmpty()) name = email.split("@")[0];
+    String rawName = ((request.firstName() != null ? request.firstName() : "") + " " + (request.lastName() != null ? request.lastName() : "")).trim();
+    final String name = rawName.isEmpty() ? email.split("@")[0] : rawName;
 
     AppUserEntity entity = existingOpt.orElseGet(() -> findOrCreateUserEntity(uid, email, name, null));
     if (request.firstName() != null) entity.setFirstName(request.firstName());
