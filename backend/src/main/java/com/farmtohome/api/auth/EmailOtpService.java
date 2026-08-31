@@ -820,6 +820,9 @@ public class EmailOtpService {
 
   private boolean doResendPost(String fromAddr, String to, String otp, String key) {
     try {
+      String cleanAddr = fromAddr != null ? fromAddr.trim() : "onboarding@resend.dev";
+      String formattedFrom = cleanAddr.contains("<") ? cleanAddr : "Farm To Home <" + cleanAddr + ">";
+
       String body = """
           {
             "from": "%s",
@@ -827,7 +830,7 @@ public class EmailOtpService {
             "subject": "Farm To Home - Email Verification OTP",
             "text": "Your Farm To Home verification OTP is: %s\\n\\nThis OTP expires in %d minutes.\\nDo not share this OTP with anyone."
           }
-          """.formatted(fromAddr, to, otp, OTP_TTL_MINUTES);
+          """.formatted(formattedFrom, to, otp, OTP_TTL_MINUTES);
 
       java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
           .uri(java.net.URI.create("https://api.resend.com/emails"))
@@ -838,7 +841,7 @@ public class EmailOtpService {
 
       java.net.http.HttpResponse<String> resp = httpClient.send(req, java.net.http.HttpResponse.BodyHandlers.ofString());
       if (resp.statusCode() >= 200 && resp.statusCode() < 300) {
-        System.out.println("[EMAIL-OTP-HTTP-SUCCESS] Sent OTP to " + mask(to) + " via Resend API (HTTPS Port 443, from: " + fromAddr + ")");
+        System.out.println("[EMAIL-OTP-HTTP-SUCCESS] Sent OTP to " + mask(to) + " via Resend API (HTTPS Port 443, from: " + formattedFrom + ")");
         return true;
       } else {
         System.err.println("[EMAIL-OTP-HTTP-FAIL] Resend API status " + resp.statusCode() + ": " + resp.body());
