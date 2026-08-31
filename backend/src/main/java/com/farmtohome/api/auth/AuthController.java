@@ -67,7 +67,7 @@ public class AuthController {
   @PostMapping("/register")
   public ApiResponse<Map<String, Object>> register(
       @Valid @RequestBody AuthDtos.RegisterRequest request) {
-    String email = request.email().trim().toLowerCase();
+    final String email = request.email().trim().toLowerCase();
 
     Optional<AppUserEntity> existingOpt = userRepository.findByEmail(email);
     if (existingOpt.isPresent()) {
@@ -117,13 +117,13 @@ public class AuthController {
 
     Map<String, Object> tokenClaims = parseJwtClaims(rawToken);
 
-    String email = (request != null && request.email() != null && !request.email().isBlank())
+    String resolvedEmail = (request != null && request.email() != null && !request.email().isBlank())
         ? request.email().trim().toLowerCase()
         : (tokenClaims.containsKey("email") ? tokenClaims.get("email").toString().trim().toLowerCase() : null);
 
-    if (email == null || email.isBlank()) {
-      email = "user_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8) + "@gmail.com";
-    }
+    final String email = (resolvedEmail == null || resolvedEmail.isBlank())
+        ? "user_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8) + "@gmail.com"
+        : resolvedEmail;
 
     Optional<AppUserEntity> existing = userRepository.findByEmail(email);
     String uid = existing.map(AppUserEntity::getFirebaseUid)
