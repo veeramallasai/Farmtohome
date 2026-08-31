@@ -7,5 +7,5 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface CategoryRepository extends JpaRepository<CategoryEntity, UUID> {
-  List<CategoryEntity> findByActiveTrueOrderByDisplayOrderAsc();
+  List<CategoryEntity> findByOrderByNameAsc();
 }

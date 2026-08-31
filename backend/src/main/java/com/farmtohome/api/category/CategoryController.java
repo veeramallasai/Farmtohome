@@ -17,6 +17,6 @@ public class CategoryController {
 
   @GetMapping
   public List<CategoryEntity> listCategories() {
-    return categoryRepository.findByActiveTrueOrderByDisplayOrderAsc();
+    return categoryRepository.findByOrderByNameAsc();
   }
 }
