@@ -97,8 +97,6 @@ public class AuthController {
     response.put("maskedEmail", com.farmtohome.api.config.MailConfig.mask(email));
     response.put("requiresEmailVerification", true);
     response.put("message", "Registration successful. Please verify the OTP sent to your email.");
-    if (otpResult.containsKey("otp")) response.put("otp", otpResult.get("otp"));
-    if (otpResult.containsKey("otpCode")) response.put("otpCode", otpResult.get("otpCode"));
     if (otpResult.containsKey("expiresInSeconds")) response.put("expiresInSeconds", otpResult.get("expiresInSeconds"));
 
     return ApiResponse.ok(response, "Registration successful. Please verify the OTP sent to your email.");

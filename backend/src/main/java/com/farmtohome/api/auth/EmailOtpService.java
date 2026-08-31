@@ -153,8 +153,6 @@ public class EmailOtpService {
     result.put("email", mask(user.email()));
     result.put("alreadyVerified", false);
     result.put("expiresInSeconds", OTP_TTL_MINUTES * 60);
-    result.put("otp", otp);
-    result.put("otpCode", otp);
     return result;
   }
 
@@ -382,8 +380,6 @@ public class EmailOtpService {
       result.put("email", mask(email));
       result.put("alreadyVerified", false);
       result.put("expiresInSeconds", OTP_TTL_MINUTES * 60);
-      result.put("otp", otp);
-      result.put("otpCode", otp);
       result.put("resetToken", resetToken);
       result.put("token", resetToken);
       return result;
@@ -982,30 +978,37 @@ public class EmailOtpService {
 
   private void sendMail(String to, String otp) {
     System.out.println("=================================================");
-    System.out.println("[EMAIL-OTP-DISPATCH-START] Dispatching OTP for " + mask(to) + " via Resend HTTPS API (Port 443)...");
+    System.out.println("[EMAIL-OTP-DISPATCH-START] Dispatching OTP email for " + mask(to) + " via HTTPS REST APIs (Port 443)...");
     System.out.println("=================================================");
 
-    // Priority 1: Primary Method - Resend HTTPS API (HTTPS Port 443 - zero SMTP port blocks)
+    // Priority 1: Brevo REST API (HTTPS Port 443 - zero SMTP port blocks, delivers to all inboxes)
+    String brevoKey = resolveBrevoApiKey();
+    if (!brevoKey.isBlank()) {
+      System.out.println("[EMAIL-OTP-EXEC] Method 1: Sending via Brevo REST API...");
+      if (sendViaBrevo(to, otp, brevoKey)) {
+        return;
+      }
+    }
+
+    // Priority 2: Resend HTTPS API (HTTPS Port 443)
     String resendKey = resolveResendApiKey();
     if (!resendKey.isBlank()) {
-      System.out.println("[EMAIL-OTP-EXEC] Primary Method: Sending via Resend HTTPS API...");
+      System.out.println("[EMAIL-OTP-EXEC] Method 2: Sending via Resend HTTPS API...");
       if (sendViaResend(to, otp, resendKey)) {
         return;
       }
-    } else {
-      System.out.println("[EMAIL-OTP-INFO] RESEND_API_KEY environment variable is not configured. Checking other HTTPS API / SMTP fallbacks...");
     }
 
-    // Priority 2: Secondary Method - SendGrid HTTPS API
+    // Priority 3: SendGrid HTTPS API
     String sgKey = resolveSendGridApiKey();
     if (!sgKey.isBlank()) {
-      System.out.println("[EMAIL-OTP-EXEC] Secondary Method: Sending via SendGrid HTTPS API...");
+      System.out.println("[EMAIL-OTP-EXEC] Method 3: Sending via SendGrid HTTPS API...");
       if (sendViaSendGrid(to, otp, sgKey)) {
         return;
       }
     }
 
-    // Priority 3: SMTP Fallback (Port 465 SSL / 587)
+    // Priority 4: Fast SMTP Fallback (2000ms timeout)
     int primaryPort = 465;
     try { primaryPort = Integer.parseInt(mailPortStr.trim()); } catch (Exception ignored) {}
 
@@ -1031,11 +1034,13 @@ public class EmailOtpService {
       System.err.println("[EMAIL-OTP-FALLBACK-ERR] Could not initialize Gmail Port 587 sender: " + e.getMessage());
     }
 
-    // All live dispatch channels restricted or unavailable (e.g. Resend free tier testing restriction on non-owner emails or Railway SMTP port blocks)
-    System.out.println("=================================================");
-    System.out.println("[EMAIL-OTP-NOTICE] External mail dispatch restricted or unavailable for " + mask(to) + ".");
-    System.out.println("[EMAIL-OTP-NOTICE] OTP generated and returned in API response data for verification.");
-    System.out.println("=================================================");
+    String failMsg = "Unable to deliver email. Railway cloud blocks outbound SMTP ports (587/465). Please configure BREVO_API_KEY or RESEND_API_KEY in Railway Environment Variables for instant HTTPS email delivery.";
+    System.err.println("=================================================");
+    System.err.println("[EMAIL-OTP-FAILURE-CRITICAL] Mail dispatch failed for " + mask(to));
+    System.err.println("[EMAIL-OTP-FAILURE-CRITICAL] " + failMsg);
+    System.err.println("=================================================");
+
+    throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, failMsg);
   }
 
   private org.springframework.mail.javamail.JavaMailSenderImpl buildGmailSender(int port) {
