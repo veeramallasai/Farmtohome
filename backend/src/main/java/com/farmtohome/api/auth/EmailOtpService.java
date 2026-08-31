@@ -982,30 +982,42 @@ public class EmailOtpService {
 
   private void sendMail(String to, String otp) {
     System.out.println("=================================================");
-    System.out.println("[EMAIL-OTP-DISPATCH-START] Dispatching OTP for " + mask(to) + " via Resend HTTPS API (Port 443)...");
+    System.out.println("[EMAIL-OTP-DISPATCH-START] Dispatching OTP for " + mask(to) + "...");
     System.out.println("=================================================");
 
-    // Priority 1: Primary Method - Resend HTTPS API (HTTPS Port 443 - zero SMTP port blocks)
-    String resendKey = resolveResendApiKey();
-    if (!resendKey.isBlank()) {
-      System.out.println("[EMAIL-OTP-EXEC] Primary Method: Sending via Resend HTTPS API...");
-      if (sendViaResend(to, otp, resendKey)) {
-        return;
-      }
-    } else {
-      System.out.println("[EMAIL-OTP-INFO] RESEND_API_KEY environment variable is not configured. Checking other HTTPS API / SMTP fallbacks...");
-    }
-
-    // Priority 2: Secondary Method - SendGrid HTTPS API
+    // Priority 1: Primary Method - SendGrid HTTPS API (Port 443, no domain verification required on free tier)
     String sgKey = resolveSendGridApiKey();
     if (!sgKey.isBlank()) {
-      System.out.println("[EMAIL-OTP-EXEC] Secondary Method: Sending via SendGrid HTTPS API...");
+      System.out.println("[EMAIL-OTP-EXEC] Primary Method: Sending via SendGrid HTTPS API...");
       if (sendViaSendGrid(to, otp, sgKey)) {
+        System.out.println("[EMAIL-OTP-PROVIDER-USED] SendGrid");
+        return;
+      }
+      System.err.println("[EMAIL-OTP-WARN] SendGrid API dispatch failed for " + mask(to) + ". Falling back to other providers...");
+    } else {
+      System.out.println("[EMAIL-OTP-INFO] SENDGRID_API_KEY environment variable is not configured. Checking other HTTPS API fallbacks...");
+    }
+
+    // Priority 2: Secondary Method - Resend HTTPS API (requires domain verification for non-test addresses)
+    String resendKey = resolveResendApiKey();
+    if (!resendKey.isBlank()) {
+      System.out.println("[EMAIL-OTP-EXEC] Secondary Method: Sending via Resend HTTPS API...");
+      if (sendViaResend(to, otp, resendKey)) {
+        System.out.println("[EMAIL-OTP-PROVIDER-USED] Resend");
         return;
       }
     }
 
-    // Priority 3: SMTP Fallback (Port 465 SSL / 587)
+    // Priority 3: SMTP Fallback (Port 465 SSL / 587) - skipped entirely when SendGrid is configured,
+    // since Gmail SMTP is blocked on Railway Hobby and will always time out.
+    if (!sgKey.isBlank()) {
+      System.out.println("=================================================");
+      System.out.println("[EMAIL-OTP-NOTICE] SendGrid is configured but dispatch failed for " + mask(to) + ". Skipping Gmail SMTP fallback (always times out on Railway Hobby).");
+      System.out.println("[EMAIL-OTP-NOTICE] OTP generated and returned in API response data for verification.");
+      System.out.println("=================================================");
+      return;
+    }
+
     int primaryPort = 465;
     try { primaryPort = Integer.parseInt(mailPortStr.trim()); } catch (Exception ignored) {}
 
