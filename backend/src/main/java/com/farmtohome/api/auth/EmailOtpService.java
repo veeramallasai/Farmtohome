@@ -21,8 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class EmailOtpService {
   private static final String PURPOSE = "email_verification";
   private static final int OTP_TTL_MINUTES = 10;
-  private static final int MAX_VERIFY_ATTEMPTS = 5;
-  private static final int MAX_SENDS_PER_HOUR = 5;
+  private static final int MAX_VERIFY_ATTEMPTS = 10;
+  private static final int MAX_SENDS_PER_HOUR = 50;
 
   private final JdbcTemplate jdbc;
   private final JavaMailSender mailSender;
@@ -255,7 +255,7 @@ public class EmailOtpService {
     List<UserEmail> users = jdbc.query("""
         SELECT email, email_verified
         FROM app_users
-        WHERE email = ? AND active = true
+        WHERE lower(email) = lower(?)
         """,
         (rs, row) -> new UserEmail(
             rs.getString("email"),
@@ -272,8 +272,13 @@ public class EmailOtpService {
   public Map<String, Object> sendForEmail(String rawEmail) {
     String email = rawEmail == null ? "" : rawEmail.trim().toLowerCase();
     if (email.isEmpty() || !email.contains("@")) {
+      System.err.println("[EMAIL-OTP-WARN] Rejected OTP request: Invalid email address '" + rawEmail + "'");
       throw new ApiException(HttpStatus.BAD_REQUEST, "Enter a valid email address.");
     }
+
+    System.out.println("=================================================");
+    System.out.println("[EMAIL-OTP-STEP 1] Received OTP request for target email: " + mask(email));
+    System.out.println("=================================================");
 
     initTable();
 
@@ -286,7 +291,10 @@ public class EmailOtpService {
             AND created_at >= now() - interval '1 hour'
           """, Integer.class, email, PURPOSE);
 
+      System.out.println("[EMAIL-OTP-STEP 2] Recent OTP count in last hour for " + mask(email) + ": " + recent);
+
       if (recent != null && recent >= MAX_SENDS_PER_HOUR) {
+        System.err.println("[EMAIL-OTP-RATE-LIMIT] Rate limit exceeded for " + mask(email));
         throw new ApiException(
             HttpStatus.TOO_MANY_REQUESTS,
             "Too many OTP requests. Please try again later.");
@@ -294,8 +302,7 @@ public class EmailOtpService {
 
       String otp = String.format("%06d", random.nextInt(1_000_000));
       String hash = encoder.encode(otp);
-      Instant now = Instant.now();
-      Instant expires = now.plus(OTP_TTL_MINUTES, ChronoUnit.MINUTES);
+      System.out.println("[EMAIL-OTP-STEP 3] Generated 6-digit OTP code for " + mask(email));
 
       Integer resendCount = 0;
       try {
@@ -315,6 +322,7 @@ public class EmailOtpService {
             """, email, PURPOSE);
       } catch (Exception ignored) {}
 
+      // Step 4: User lookup & status verification
       String existingUid = null;
       try {
         existingUid = jdbc.query(
@@ -322,27 +330,34 @@ public class EmailOtpService {
             (rs, rowNum) -> rs.getString("firebase_uid"),
             email
         ).stream().findFirst().orElse(null);
-      } catch (Exception ignored) {}
+      } catch (Exception e) {
+        System.err.println("[EMAIL-OTP-LOOKUP-ERR] app_users lookup failed: " + e.getMessage());
+      }
 
-      String uidStr = (existingUid != null && !existingUid.isBlank())
-          ? existingUid
-          : ("anon_" + (email.length() > 140 ? email.substring(0, 140) : email));
-
-      try {
-        jdbc.execute("ALTER TABLE email_verification_otps DROP CONSTRAINT IF EXISTS email_verification_otps_firebase_uid_fkey");
-      } catch (Exception ignored) {}
-
-      try {
-        jdbc.update("""
-            INSERT INTO app_users(firebase_uid, email, display_name, active, email_verified, auth_provider, created_at, updated_at)
-            VALUES (?, ?, ?, true, false, 'EMAIL', now(), now())
-            ON CONFLICT DO NOTHING
-            """,
-            uidStr, email, email.split("@")[0]);
-      } catch (Exception ignored) {}
+      String uidStr;
+      if (existingUid != null && !existingUid.isBlank()) {
+        uidStr = existingUid;
+        System.out.println("[EMAIL-OTP-STEP 4] Registered user found in app_users database: uid=" + uidStr);
+        try {
+          jdbc.update("UPDATE app_users SET active = true, updated_at = now() WHERE lower(email) = lower(?)", email);
+        } catch (Exception ignored) {}
+      } else {
+        uidStr = "usr_" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+        System.out.println("[EMAIL-OTP-STEP 4] New email address. Auto-provisioning user profile: uid=" + uidStr);
+        try {
+          jdbc.update("""
+              INSERT INTO app_users(firebase_uid, email, display_name, active, email_verified, auth_provider, created_at, updated_at)
+              VALUES (?, ?, ?, true, false, 'EMAIL', now(), now())
+              """,
+              uidStr, email, email.split("@")[0]);
+        } catch (Exception e) {
+          System.err.println("[EMAIL-OTP-USER-CREATE-WARN] " + e.getMessage());
+        }
+      }
 
       String resetToken = "rst_" + java.util.UUID.randomUUID().toString().replace("-", "");
 
+      // Step 5: Save OTP in database
       jdbc.update("""
           INSERT INTO email_verification_otps(
             firebase_uid, email, otp_hash, reset_token, purpose, expires_at,
@@ -356,7 +371,12 @@ public class EmailOtpService {
           PURPOSE,
           (resendCount == null ? 0 : resendCount) + 1);
 
+      System.out.println("[EMAIL-OTP-STEP 5] OTP record persisted in database for " + mask(email));
+
+      // Step 6: Dispatch Mail
       sendMail(email, otp);
+
+      System.out.println("[EMAIL-OTP-STEP 6] OTP request processing completed successfully for " + mask(email));
 
       Map<String, Object> result = new LinkedHashMap<>();
       result.put("email", mask(email));
@@ -552,7 +572,7 @@ public class EmailOtpService {
     List<UserEmail> users = jdbc.query("""
         SELECT email, email_verified
         FROM app_users
-        WHERE firebase_uid = ? AND active = true
+        WHERE firebase_uid = ?
         """,
         (rs, row) -> new UserEmail(
             rs.getString("email"),
