@@ -1,59 +1,40 @@
 package com.farmtohome.api.config;
 
-import java.io.IOException;
-
+import java.util.List;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
-
-import jakarta.servlet.Filter;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.ServletRequest;
-import jakarta.servlet.ServletResponse;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 
 /**
- * Filter placed at HIGHEST_PRECEDENCE to handle CORS preflight OPTIONS requests
- * immediately with 200 OK and valid CORS headers across all origins.
+ * Filter placed at HIGHEST_PRECEDENCE using Spring's official CorsFilter to handle CORS
+ * preflight OPTIONS and cross-origin requests cleanly without header duplication.
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
-public class PreflightCorsFilter implements Filter {
+public class PreflightCorsFilter extends CorsFilter {
 
-    @Override
-    public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
-            throws IOException, ServletException {
-        HttpServletRequest request = (HttpServletRequest) req;
-        HttpServletResponse response = (HttpServletResponse) res;
+    public PreflightCorsFilter() {
+        super(createCorsConfigurationSource());
+    }
 
-        String origin = request.getHeader("Origin");
-        if (origin != null && !origin.trim().isEmpty()) {
-            response.setHeader("Access-Control-Allow-Origin", origin);
-            response.setHeader("Access-Control-Allow-Credentials", "true");
-        } else {
-            response.setHeader("Access-Control-Allow-Origin", "*");
-        }
+    private static UrlBasedCorsConfigurationSource createCorsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowCredentials(true);
+        config.addAllowedOriginPattern("*");
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Requested-With", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", "*"));
+        config.setExposedHeaders(List.of(
+            "Authorization", "Content-Type", "X-Total-Count", 
+            "Access-Control-Allow-Origin", "Access-Control-Allow-Credentials"
+        ));
+        config.setMaxAge(3600L);
 
-        response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD");
-        
-        String reqHeaders = request.getHeader("Access-Control-Request-Headers");
-        if (reqHeaders != null && !reqHeaders.trim().isEmpty()) {
-            response.setHeader("Access-Control-Allow-Headers", reqHeaders);
-        } else {
-            response.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept, X-Requested-With, Origin, Access-Control-Request-Method, Access-Control-Request-Headers");
-        }
-        
-        response.setHeader("Access-Control-Exposed-Headers", "Authorization, Content-Type, X-Total-Count, Access-Control-Allow-Origin, Access-Control-Allow-Credentials");
-
-        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
-            response.setHeader("Access-Control-Max-Age", "3600");
-            response.setStatus(HttpServletResponse.SC_OK);
-            return;
-        }
-
-        chain.doFilter(req, res);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
     }
 }
 
