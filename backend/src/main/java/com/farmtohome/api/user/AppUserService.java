@@ -29,6 +29,7 @@ public class AppUserService {
       user.setFirebaseUid(cleanUid);
       user.setCreatedAt(now);
       user.setActive(true);
+      user.setAuthProvider("EMAIL");
     }
 
     String firstName = preferred(request.firstName(), user.getFirstName());
@@ -61,6 +62,9 @@ public class AppUserService {
     user.setPhotoUrl(preferred(request.photoUrl(), user.getPhotoUrl()));
     user.setShoppingMode(choice(request.shoppingMode(), user.getShoppingMode(), "home", "shop"));
     user.setAccountType(choice(request.accountType(), user.getAccountType(), "customer", "shop_owner"));
+    if (user.getAuthProvider() == null || user.getAuthProvider().isBlank()) {
+      user.setAuthProvider("EMAIL");
+    }
     user.setActive(true);
     user.setLastLoginAt(now);
     user.setUpdatedAt(now);

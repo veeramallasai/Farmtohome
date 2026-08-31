@@ -154,9 +154,12 @@ public class AuthController {
     return userRepository.findById(uid).orElseGet(() -> {
       AppUserEntity user = new AppUserEntity();
       user.setFirebaseUid(uid);
-      user.setEmail(email);
-      user.setDisplayName(displayName != null ? displayName : email.split("@")[0]);
-      user.setPhotoUrl(photoUrl);
+      user.setEmail(email != null ? email : "");
+      user.setDisplayName(displayName != null ? displayName : (email != null && email.contains("@") ? email.split("@")[0] : uid));
+      user.setPhotoUrl(photoUrl != null ? photoUrl : "");
+      if (user.getAuthProvider() == null || user.getAuthProvider().isBlank()) {
+        user.setAuthProvider("EMAIL");
+      }
       user.setActive(true);
       user.setCreatedAt(Instant.now());
       user.setUpdatedAt(Instant.now());

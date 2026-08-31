@@ -33,7 +33,7 @@ spring:
     default-property-inclusion: non_null
   mail:
     host: ${spring.mail.host:${SPRING_MAIL_HOST:${MAIL_HOST:smtp.gmail.com}}}
-    port: ${spring.mail.port:${SPRING_MAIL_PORT:${MAIL_PORT:465}}}
+    port: ${spring.mail.port:${SPRING_MAIL_PORT:${MAIL_PORT:587}}}
     username: ${spring.mail.username:${SPRING_MAIL_USERNAME:${MAIL_USERNAME:${APP_MAIL_FROM:${MAIL_FROM:veeramallasaipichaiah456@gmail.com}}}}}
     password: ${spring.mail.password:${SPRING_MAIL_PASSWORD:${MAIL_PASSWORD:hinnvjmxxziliiim}}}
     properties:
@@ -42,9 +42,9 @@ spring:
           auth: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:true}
           ssl:
             trust: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_TRUST:*}
-          connectiontimeout: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_CONNECTIONTIMEOUT:15000}
-          timeout: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_TIMEOUT:15000}
-          writetimeout: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_WRITETIMEOUT:15000}
+          connectiontimeout: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_CONNECTIONTIMEOUT:4000}
+          timeout: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_TIMEOUT:4000}
+          writetimeout: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_WRITETIMEOUT:4000}
 
 management:
   endpoints:

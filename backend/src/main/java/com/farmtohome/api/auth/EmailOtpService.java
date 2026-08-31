@@ -34,7 +34,6 @@ public class EmailOtpService {
   private final String mailUsername;
   private final String mailPassword;
   private final String resendApiKey;
-  private final String brevoApiKey;
   private final String sendgridApiKey;
   private final java.net.http.HttpClient httpClient = java.net.http.HttpClient.newBuilder()
       .connectTimeout(java.time.Duration.ofSeconds(10))
@@ -45,11 +44,10 @@ public class EmailOtpService {
       JavaMailSender mailSender,
       @Value("${app.mail-from:${MAIL_FROM:${spring.mail.username:${SPRING_MAIL_USERNAME:veeramallasaipichaiah456@gmail.com}}}}") String mailFrom,
       @Value("${spring.mail.host:${SPRING_MAIL_HOST:${MAIL_HOST:smtp.gmail.com}}}") String mailHost,
-      @Value("${spring.mail.port:${SPRING_MAIL_PORT:${MAIL_PORT:465}}}") String mailPortStr,
+      @Value("${spring.mail.port:${SPRING_MAIL_PORT:${MAIL_PORT:587}}}") String mailPortStr,
       @Value("${spring.mail.username:${SPRING_MAIL_USERNAME:${MAIL_USERNAME:${APP_MAIL_FROM:${MAIL_FROM:veeramallasaipichaiah456@gmail.com}}}}}") String mailUsername,
       @Value("${spring.mail.password:${SPRING_MAIL_PASSWORD:${MAIL_PASSWORD:hinnvjmxxziliiim}}}") String mailPassword,
       @Value("${RESEND_API_KEY:${MAIL_RESEND_API_KEY:}}") String resendApiKey,
-      @Value("${BREVO_API_KEY:${MAIL_BREVO_API_KEY:}}") String brevoApiKey,
       @Value("${SENDGRID_API_KEY:${MAIL_SENDGRID_API_KEY:}}") String sendgridApiKey) {
     this.jdbc = jdbc;
     this.mailSender = mailSender;
@@ -59,7 +57,6 @@ public class EmailOtpService {
     this.mailUsername = mailUsername;
     this.mailPassword = mailPassword;
     this.resendApiKey = resendApiKey;
-    this.brevoApiKey = brevoApiKey;
     this.sendgridApiKey = sendgridApiKey;
   }
 
@@ -329,8 +326,8 @@ public class EmailOtpService {
 
       try {
         jdbc.update("""
-            INSERT INTO app_users(firebase_uid, email, display_name, active, email_verified, created_at, updated_at)
-            VALUES (?, ?, ?, true, false, now(), now())
+            INSERT INTO app_users(firebase_uid, email, display_name, active, email_verified, auth_provider, created_at, updated_at)
+            VALUES (?, ?, ?, true, false, 'EMAIL', now(), now())
             ON CONFLICT DO NOTHING
             """,
             uidStr, email, email.split("@")[0]);
@@ -468,7 +465,6 @@ public class EmailOtpService {
     details.put("configuredUsername", com.farmtohome.api.config.MailConfig.mask(mailUsername));
     details.put("passwordConfigured", mailPassword != null && !mailPassword.isBlank() ? "YES (Length=" + mailPassword.trim().replaceAll("\\s+", "").length() + ")" : "NO");
     details.put("configuredFrom", mailFrom);
-    details.put("brevoApiKeyResolved", !resolveBrevoApiKey().isBlank() ? "YES" : "NO");
     details.put("resendApiKeyResolved", !resolveResendApiKey().isBlank() ? "YES" : "NO");
     details.put("sendgridApiKeyResolved", !resolveSendGridApiKey().isBlank() ? "YES" : "NO");
 
@@ -549,9 +545,9 @@ public class EmailOtpService {
     props.put("mail.smtp.auth", "true");
     props.put("mail.smtp.ssl.trust", "*");
     props.put("mail.smtp.ssl.protocols", "TLSv1.2 TLSv1.3");
-    props.put("mail.smtp.connectiontimeout", "10000");
-    props.put("mail.smtp.timeout", "10000");
-    props.put("mail.smtp.writetimeout", "10000");
+    props.put("mail.smtp.connectiontimeout", "4000");
+    props.put("mail.smtp.timeout", "4000");
+    props.put("mail.smtp.writetimeout", "4000");
 
     if (port == 465) {
       props.put("mail.smtp.ssl.enable", "true");
@@ -603,20 +599,6 @@ public class EmailOtpService {
     }
   }
 
-  private String resolveBrevoApiKey() {
-    if (brevoApiKey != null && !brevoApiKey.isBlank()) {
-      return brevoApiKey.trim();
-    }
-    String cleanPw = (mailPassword != null) ? mailPassword.trim().replaceAll("\\s+", "") : "";
-    if (cleanPw.startsWith("xkeysib-") || cleanPw.startsWith("xsmtpsib-")) {
-      return cleanPw;
-    }
-    if (mailHost != null && (mailHost.contains("brevo") || mailHost.contains("sendinblue")) && !cleanPw.isBlank()) {
-      return cleanPw;
-    }
-    return "";
-  }
-
   private String resolveResendApiKey() {
     if (resendApiKey != null && !resendApiKey.isBlank()) {
       return resendApiKey.trim();
@@ -646,21 +628,16 @@ public class EmailOtpService {
   }
 
   private String resolveFromAddress() {
-    if (mailFrom != null && !mailFrom.isBlank() && mailFrom.contains("@") && !mailFrom.toLowerCase().contains("smtp-brevo.com")) {
+    if (mailFrom != null && !mailFrom.isBlank() && mailFrom.contains("@")) {
       return mailFrom.trim();
     }
-    if (mailUsername != null && !mailUsername.isBlank() && mailUsername.contains("@") && !mailUsername.toLowerCase().contains("smtp-brevo.com")) {
+    if (mailUsername != null && !mailUsername.isBlank() && mailUsername.contains("@")) {
       return mailUsername.trim();
     }
     return "veeramallasaipichaiah456@gmail.com";
   }
 
   private boolean tryHttpApiSend(String to, String otp) {
-    String brevoKey = resolveBrevoApiKey();
-    if (!brevoKey.isBlank()) {
-      System.out.println("[EMAIL-OTP-EXEC] Attempting HTTPS Email send via Brevo API (HTTPS Port 443)...");
-      if (sendViaBrevo(to, otp, brevoKey)) return true;
-    }
     String resendKey = resolveResendApiKey();
     if (!resendKey.isBlank()) {
       System.out.println("[EMAIL-OTP-EXEC] Attempting HTTPS Email send via Resend API (HTTPS Port 443)...");
@@ -708,40 +685,6 @@ public class EmailOtpService {
     }
   }
 
-  private boolean sendViaBrevo(String to, String otp, String key) {
-    try {
-      String fromAddr = resolveFromAddress();
-      String body = """
-          {
-            "sender": {"name": "Farm To Home", "email": "%s"},
-            "to": [{"email": "%s"}],
-            "subject": "Farm To Home - Email Verification OTP",
-            "textContent": "Your Farm To Home verification OTP is: %s\\n\\nThis OTP expires in %d minutes.\\nDo not share this OTP with anyone."
-          }
-          """.formatted(fromAddr, to, otp, OTP_TTL_MINUTES);
-
-      java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
-          .uri(java.net.URI.create("https://api.brevo.com/v3/smtp/email"))
-          .header("api-key", key.trim())
-          .header("Content-Type", "application/json")
-          .POST(java.net.http.HttpRequest.BodyPublishers.ofString(body))
-          .build();
-
-      java.net.http.HttpResponse<String> resp = httpClient.send(req, java.net.http.HttpResponse.BodyHandlers.ofString());
-      if (resp.statusCode() >= 200 && resp.statusCode() < 300) {
-        System.out.println("[EMAIL-OTP-HTTP-SUCCESS] Sent OTP to " + mask(to) + " via Brevo API (HTTPS Port 443)");
-        return true;
-      } else {
-        System.err.println("[EMAIL-OTP-HTTP-FAIL] Brevo API status " + resp.statusCode() + ": " + resp.body());
-        return false;
-      }
-    } catch (Exception e) {
-      System.err.println("[EMAIL-OTP-HTTP-ERR] Brevo API failed: " + e.getMessage());
-      e.printStackTrace();
-      return false;
-    }
-  }
-
   private boolean sendViaSendGrid(String to, String otp, String key) {
     try {
       String fromAddr = resolveFromAddress();
@@ -778,55 +721,87 @@ public class EmailOtpService {
 
   private void sendMail(String to, String otp) {
     System.out.println("=================================================");
-    System.out.println("[EMAIL-OTP-DISPATCH-START] Dispatching OTP for " + mask(to));
-    System.out.println("[EMAIL-OTP-CONFIG] Host: " + mailHost + ", Username: " + mask(mailUsername)
-        + ", Password length: " + (mailPassword != null ? mailPassword.trim().replaceAll("\\s+", "").length() : 0));
+    System.out.println("[EMAIL-OTP-DISPATCH-START] Dispatching OTP via Gmail SMTP for " + mask(to));
     System.out.println("=================================================");
 
-    // Priority 1: Check HTTPS Email API (Resend / Brevo / SendGrid over HTTPS Port 443)
-    if (tryHttpApiSend(to, otp)) {
-      return;
-    }
-
-    int primaryPort = 465;
+    int primaryPort = 587;
     try { primaryPort = Integer.parseInt(mailPortStr.trim()); } catch (Exception ignored) {}
 
-    // Priority 2: Primary JavaMailSender SMTP (Port 465/587)
+    // Priority 1: Primary JavaMailSender SMTP (Port 587 STARTTLS)
     if (trySendWithSender(mailSender, to, otp, "Primary Sender (Port " + primaryPort + ")")) {
       return;
     }
 
-    // Priority 3: Alternate SMTP port fallback (Port 587 if primary was 465, or Port 465 if primary was 587)
-    int altPort = (primaryPort == 465) ? 587 : 465;
+    // Priority 2: Gmail SMTP Port 587 STARTTLS Sender
     try {
-      JavaMailSender altSender = buildSenderForPort(altPort);
-      if (trySendWithSender(altSender, to, otp, "Alternate Fallback (Port " + altPort + ")")) {
+      JavaMailSender gmail587 = buildGmailSender(587);
+      if (trySendWithSender(gmail587, to, otp, "Gmail SMTP (Port 587 STARTTLS)")) {
         return;
       }
     } catch (Exception e) {
-      System.err.println("[EMAIL-OTP-FALLBACK-ERR] Could not initialize fallback sender on Port " + altPort + ": " + e.getMessage());
+      System.err.println("[EMAIL-OTP-FALLBACK-ERR] Could not initialize Gmail Port 587 sender: " + e.getMessage());
     }
 
-    // Priority 3.5: Port 2525 fallback (Brevo alternative SMTP port)
-    if (primaryPort != 2525 && altPort != 2525) {
-      try {
-        JavaMailSender port2525Sender = buildSenderForPort(2525);
-        if (trySendWithSender(port2525Sender, to, otp, "Brevo Alt Port 2525")) {
-          return;
-        }
-      } catch (Exception e) {
-        System.err.println("[EMAIL-OTP-FALLBACK-ERR] Could not initialize sender on Port 2525: " + e.getMessage());
+    // Priority 3: Gmail SMTP Port 465 SSL Fallback Sender
+    try {
+      JavaMailSender gmail465 = buildGmailSender(465);
+      if (trySendWithSender(gmail465, to, otp, "Gmail SMTP (Port 465 SSL)")) {
+        return;
       }
+    } catch (Exception e) {
+      System.err.println("[EMAIL-OTP-FALLBACK-ERR] Could not initialize Gmail Port 465 sender: " + e.getMessage());
+    }
+
+    // Priority 4: Check HTTPS Email API (Resend / SendGrid if configured)
+    if (tryHttpApiSend(to, otp)) {
+      return;
     }
 
     // All send channels failed: Throw exception so the endpoint returns 500 error and client does NOT treat send as success!
-    String failMsg = "Unable to dispatch verification email. Please verify SMTP configuration, Gmail app password, or configure a mail API key.";
+    String failMsg = "Unable to dispatch verification email. Please verify Gmail app password or network access.";
     System.err.println("=================================================");
     System.err.println("[EMAIL-OTP-FAILURE-CRITICAL] All mail dispatch attempts failed for " + mask(to));
     System.err.println("[EMAIL-OTP-FAILURE-CRITICAL] Throwing ApiException to return HTTP error status to caller.");
     System.err.println("=================================================");
 
     throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, failMsg);
+  }
+
+  private org.springframework.mail.javamail.JavaMailSenderImpl buildGmailSender(int port) {
+    org.springframework.mail.javamail.JavaMailSenderImpl sender = new org.springframework.mail.javamail.JavaMailSenderImpl();
+    sender.setHost("smtp.gmail.com");
+    sender.setPort(port);
+    String user = (mailUsername != null && !mailUsername.isBlank()) ? mailUsername.trim() : "veeramallasaipichaiah456@gmail.com";
+    String pw = (mailPassword != null && !mailPassword.isBlank()) ? mailPassword.trim().replaceAll("\\s+", "") : "hinnvjmxxziliiim";
+    sender.setUsername(user);
+    sender.setPassword(pw);
+    sender.setProtocol("smtp");
+    sender.setDefaultEncoding("UTF-8");
+
+    java.util.Properties props = sender.getJavaMailProperties();
+    props.put("mail.smtp.auth", "true");
+    props.put("mail.smtp.ssl.trust", "*");
+    props.put("mail.smtp.ssl.protocols", "TLSv1.2 TLSv1.3");
+    props.put("mail.smtp.connectiontimeout", "4000");
+    props.put("mail.smtp.timeout", "4000");
+    props.put("mail.smtp.writetimeout", "4000");
+
+    if (port == 465) {
+      props.put("mail.smtp.ssl.enable", "true");
+      props.put("mail.smtp.starttls.enable", "false");
+      props.put("mail.smtp.starttls.required", "false");
+      props.put("mail.smtp.socketFactory.port", "465");
+      props.put("mail.smtp.socketFactory.class", "javax.net.ssl.SSLSocketFactory");
+      props.put("mail.smtp.socketFactory.fallback", "false");
+    } else {
+      props.put("mail.smtp.ssl.enable", "false");
+      props.put("mail.smtp.starttls.enable", "true");
+      props.put("mail.smtp.starttls.required", "true");
+      props.remove("mail.smtp.socketFactory.port");
+      props.remove("mail.smtp.socketFactory.class");
+      props.remove("mail.smtp.socketFactory.fallback");
+    }
+    return sender;
   }
 
   private String mask(String email) {

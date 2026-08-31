@@ -20,18 +20,18 @@ public class MailConfig {
   @Primary
   public JavaMailSender javaMailSender(
       @Value("${spring.mail.host:${SPRING_MAIL_HOST:${MAIL_HOST:smtp.gmail.com}}}") String host,
-      @Value("${spring.mail.port:${SPRING_MAIL_PORT:${MAIL_PORT:465}}}") String portStr,
+      @Value("${spring.mail.port:${SPRING_MAIL_PORT:${MAIL_PORT:587}}}") String portStr,
       @Value("${spring.mail.username:${SPRING_MAIL_USERNAME:${MAIL_USERNAME:${APP_MAIL_FROM:${MAIL_FROM:veeramallasaipichaiah456@gmail.com}}}}}") String username,
       @Value("${spring.mail.password:${SPRING_MAIL_PASSWORD:${MAIL_PASSWORD:hinnvjmxxziliiim}}}") String password) {
 
-    int port = 465;
+    int port = 587;
     try {
       if (portStr != null && !portStr.trim().isEmpty()) {
         port = Integer.parseInt(portStr.trim());
       }
     } catch (NumberFormatException e) {
-      System.err.println("[MAIL-CONFIG-WARN] Invalid mail port '" + portStr + "', falling back to 465");
-      port = 465;
+      System.err.println("[MAIL-CONFIG-WARN] Invalid mail port '" + portStr + "', falling back to 587");
+      port = 587;
     }
 
     JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
@@ -47,9 +47,9 @@ public class MailConfig {
     props.put("mail.smtp.auth", "true");
     props.put("mail.smtp.ssl.trust", "*");
     props.put("mail.smtp.ssl.protocols", "TLSv1.2 TLSv1.3");
-    props.put("mail.smtp.connectiontimeout", "10000");
-    props.put("mail.smtp.timeout", "10000");
-    props.put("mail.smtp.writetimeout", "10000");
+    props.put("mail.smtp.connectiontimeout", "4000");
+    props.put("mail.smtp.timeout", "4000");
+    props.put("mail.smtp.writetimeout", "4000");
 
     String securityMode;
     if (port == 465) {
