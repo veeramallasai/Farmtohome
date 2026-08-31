@@ -5,14 +5,15 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Table(name = "categories")
 public class CategoryEntity {
 
   @Id
-  @Column(name = "id", length = 80, nullable = false)
-  private String id;
+  @Column(name = "id", nullable = false)
+  private UUID id;
 
   @Column(name = "name", length = 160, nullable = false)
   private String name;
@@ -43,8 +44,8 @@ public class CategoryEntity {
 
   public CategoryEntity() {}
 
-  public String getId() { return id; }
-  public void setId(String id) { this.id = id; }
+  public UUID getId() { return id; }
+  public void setId(UUID id) { this.id = id; }
 
   public String getName() { return name; }
   public void setName(String name) { this.name = name; }
