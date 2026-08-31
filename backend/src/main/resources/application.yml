@@ -2,6 +2,12 @@ server:
   port: ${PORT:8085}
   shutdown: graceful
 
+google:
+  oauth2:
+    client-id: ${GOOGLE_OAUTH_CLIENT_ID:your-client-id.apps.googleusercontent.com}
+    client-secret: ${GOOGLE_OAUTH_CLIENT_SECRET:}
+    issuer: https://accounts.google.com
+
 spring:
   application:
     name: farm-to-home-api

@@ -194,6 +194,35 @@ class BackendAuth {
     return _complete(response.data, email: email);
   }
 
+  /// Signs in using a real Google ID token obtained from Google's official
+  /// account chooser (via google_sign_in). The backend independently verifies
+  /// the token against Google's public keys before issuing a session token.
+  Future<UserCredential> signInWithGoogleOAuth({
+    required String idToken,
+    required String email,
+    String? name,
+    String? photoUrl,
+  }) async {
+    if (idToken.trim().isEmpty) {
+      throw BackendAuthException(
+        code: 'no-id-token',
+        message: 'Failed to get ID token from Google.',
+      );
+    }
+
+    final response = await _apiClient.post(
+      '/api/v1/auth/google',
+      body: <String, dynamic>{
+        'idToken': idToken.trim(),
+        'email': email.trim().toLowerCase(),
+        if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
+        if (photoUrl != null && photoUrl.trim().isNotEmpty)
+          'photoUrl': photoUrl.trim(),
+      },
+    );
+    return _complete(response.data, email: email);
+  }
+
   Future<void> verifyPhoneNumber({
     required String phoneNumber,
     void Function(String, int?)? onCodeSent,

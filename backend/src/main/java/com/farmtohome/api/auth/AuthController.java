@@ -5,9 +5,7 @@ import com.farmtohome.api.common.ApiResponse;
 import com.farmtohome.api.user.AppUserEntity;
 import com.farmtohome.api.user.AppUserRepository;
 import jakarta.validation.Valid;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -23,12 +21,15 @@ public class AuthController {
 
   private final AppUserRepository userRepository;
   private final EmailOtpService emailOtpService;
+  private final GoogleOAuthService googleOAuthService;
 
   public AuthController(
       AppUserRepository userRepository,
-      EmailOtpService emailOtpService) {
+      EmailOtpService emailOtpService,
+      GoogleOAuthService googleOAuthService) {
     this.userRepository = userRepository;
     this.emailOtpService = emailOtpService;
+    this.googleOAuthService = googleOAuthService;
   }
 
   @PostMapping("/login")
@@ -102,25 +103,76 @@ public class AuthController {
     return ApiResponse.ok(response, "Registration successful. Please verify the OTP sent to your email.");
   }
 
-  @PostMapping({"/social-login", "/google", "/google-login", "/google/login", "/google-signin", "/social", "/social/login"})
+  @PostMapping({"/google", "/google-login", "/google-oauth", "/oauth/google"})
+  public ApiResponse<AuthDtos.AuthResponse> googleOAuth(
+      @Valid @RequestBody AuthDtos.GoogleOAuthRequest request) {
+
+    // 1. Verify ID token with Google
+    Map<String, Object> claims = googleOAuthService.verifyIdToken(request.idToken());
+
+    if (claims.isEmpty()) {
+      throw new ApiException(HttpStatus.UNAUTHORIZED, "Invalid or expired Google ID token.");
+    }
+
+    String googleSubject = claims.get("sub").toString();
+    String email = request.email() != null && !request.email().isBlank()
+        ? request.email().toLowerCase()
+        : claims.getOrDefault("email", "").toString().toLowerCase();
+
+    if (email.isBlank()) {
+      throw new ApiException(HttpStatus.BAD_REQUEST, "No email found in Google account.");
+    }
+
+    boolean emailVerified = Boolean.TRUE.equals(claims.getOrDefault("email_verified", false));
+
+    // 2. Find or create user
+    Optional<AppUserEntity> existing = userRepository.findByEmail(email);
+
+    String uid = existing.map(AppUserEntity::getFirebaseUid)
+        .orElseGet(() -> "goog_" + googleSubject.replace("-", "").substring(0, Math.min(16, googleSubject.replace("-", "").length())));
+
+    String name = request.name() != null && !request.name().isBlank()
+        ? request.name()
+        : claims.getOrDefault("name", email.split("@")[0]).toString();
+
+    String photoUrl = request.photoUrl() != null && !request.photoUrl().isBlank()
+        ? request.photoUrl()
+        : claims.getOrDefault("picture", "").toString();
+
+    // 3. Create or update user
+    AppUserEntity entity = existing.orElseGet(() -> findOrCreateUserEntity(uid, email, name, photoUrl));
+    entity.setAuthProvider("GOOGLE");
+    entity.setEmailVerified(emailVerified);
+    entity.setActive(true);
+    userRepository.save(entity);
+
+    // 4. Issue JWT and login
+    return processUserLogin(uid, email, entity.getDisplayName(), entity.getPhotoUrl());
+  }
+
+  /**
+   * Legacy/other-provider social login (e.g. Apple). Google sign-in must use
+   * the {@link #googleOAuth} endpoint, which verifies the ID token with
+   * Google before creating a session.
+   */
+  @PostMapping("/social-login")
   public ApiResponse<AuthDtos.AuthResponse> socialLogin(
       @RequestBody AuthDtos.SocialLoginRequest request) {
     String prov = (request != null && request.provider() != null && !request.provider().isBlank())
         ? request.provider().trim().toLowerCase()
-        : "google";
+        : "apple";
 
-    String rawToken = request != null
-        ? (request.idToken() != null ? request.idToken() : (request.token() != null ? request.token() : request.credential()))
-        : null;
-
-    Map<String, Object> tokenClaims = parseJwtClaims(rawToken);
+    if ("google".equals(prov)) {
+      throw new ApiException(HttpStatus.BAD_REQUEST,
+          "Google sign-in must use the /auth/google endpoint with a verified ID token.");
+    }
 
     String email = (request != null && request.email() != null && !request.email().isBlank())
         ? request.email().trim().toLowerCase()
-        : (tokenClaims.containsKey("email") ? tokenClaims.get("email").toString().trim().toLowerCase() : null);
+        : null;
 
     if (email == null || email.isBlank()) {
-      email = "user_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8) + "@gmail.com";
+      throw new ApiException(HttpStatus.BAD_REQUEST, "Email is required for social login.");
     }
 
     Optional<AppUserEntity> existing = userRepository.findByEmail(email);
@@ -130,19 +182,13 @@ public class AuthController {
     String firstName = (request != null && request.firstName() != null) ? request.firstName() : "";
     String lastName = (request != null && request.lastName() != null) ? request.lastName() : "";
     String name = (firstName + " " + lastName).trim();
-
-    if (name.isEmpty() && tokenClaims.containsKey("name")) {
-      name = tokenClaims.get("name").toString().trim();
-    }
     if (name.isEmpty()) name = email.split("@")[0];
 
     String photo = (request != null && request.photoUrl() != null) ? request.photoUrl() : null;
-    if ((photo == null || photo.isBlank()) && tokenClaims.containsKey("picture")) {
-      photo = tokenClaims.get("picture").toString().trim();
-    }
 
-    AppUserEntity entity = findOrCreateUserEntity(uid, email, name, photo);
-    entity.setAuthProvider(prov);
+    AppUserEntity entity = existing.orElseGet(() -> findOrCreateUserEntity(uid, email, name, photo));
+    entity.setAuthProvider(prov.toUpperCase());
+    entity.setActive(true);
     userRepository.save(entity);
 
     return processUserLogin(uid, email, entity.getDisplayName(), entity.getPhotoUrl());
@@ -206,18 +252,5 @@ public class AuthController {
       user.setLastLoginAt(Instant.now());
       return userRepository.save(user);
     });
-  }
-
-  private Map<String, Object> parseJwtClaims(String token) {
-    if (token == null || token.isBlank()) return Map.of();
-    try {
-      String[] parts = token.split("\\.");
-      if (parts.length < 2) return Map.of();
-      String payload = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
-      com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-      return mapper.readValue(payload, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-    } catch (Exception e) {
-      return Map.of();
-    }
   }
 }
