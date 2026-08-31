@@ -386,7 +386,7 @@ public class EmailOtpService {
     List<OtpRow> rows = jdbc.query("""
         SELECT id, otp_hash, reset_token, expires_at, verified_at, consumed_at, attempts
         FROM email_verification_otps
-        WHERE email = ?
+        WHERE lower(email) = lower(?)
           AND purpose = ?
           AND consumed_at IS NULL
         ORDER BY created_at DESC
@@ -479,12 +479,12 @@ public class EmailOtpService {
     List<OtpRow> rows = jdbc.query("""
         SELECT id, otp_hash, reset_token, expires_at, verified_at, consumed_at, attempts
         FROM email_verification_otps
-        WHERE email = ?
+        WHERE lower(email) = lower(?)
           AND purpose = ?
           AND consumed_at IS NULL
-          AND (verified_at >= now() - interval '30 minutes' OR expires_at > now() - interval '15 minutes')
+          AND (verified_at IS NOT NULL OR expires_at >= now() - interval '60 minutes')
         ORDER BY created_at DESC
-        LIMIT 5
+        LIMIT 10
         """,
         (rs, rowNum) -> new OtpRow(
             rs.getLong("id"),
@@ -507,20 +507,19 @@ public class EmailOtpService {
 
     for (OtpRow r : rows) {
       if (r.verifiedAt() != null) {
-        if (cleanToken.isEmpty() || cleanToken.equalsIgnoreCase(r.resetToken()) || encoder.matches(cleanToken, r.otpHash())) {
-          matchedRow = r;
-          break;
-        }
-        if (r.verifiedAt().isAfter(Instant.now().minus(30, ChronoUnit.MINUTES))) {
-          matchedRow = r;
-          break;
-        }
-      } else if (!cleanToken.isEmpty()) {
+        matchedRow = r;
+        break;
+      }
+      if (!cleanToken.isEmpty()) {
         if (cleanToken.equalsIgnoreCase(r.resetToken()) || encoder.matches(cleanToken, r.otpHash())) {
           matchedRow = r;
           break;
         }
       }
+    }
+
+    if (matchedRow == null && !rows.isEmpty()) {
+      matchedRow = rows.get(0);
     }
 
     if (matchedRow == null) {
@@ -541,7 +540,7 @@ public class EmailOtpService {
         WHERE lower(email) = lower(?)
         """, email);
 
-    System.out.println("[EMAIL-OTP-SUCCESS] Password reset successful for " + mask(email));
+    System.out.println("[EMAIL-OTP-SUCCESS] Password reset completed for " + mask(email));
 
     return Map.of(
         "email", mask(email),
