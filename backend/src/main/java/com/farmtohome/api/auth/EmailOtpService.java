@@ -842,6 +842,11 @@ public class EmailOtpService {
   }
 
   private boolean tryHttpApiSend(String to, String otp) {
+    String sgKey = resolveSendGridApiKey();
+    if (!sgKey.isBlank()) {
+      System.out.println("[EMAIL-OTP-EXEC] Attempting HTTPS Email send via SendGrid API (HTTPS Port 443)...");
+      if (sendViaSendGrid(to, otp, sgKey)) return true;
+    }
     String resendKey = resolveResendApiKey();
     if (!resendKey.isBlank()) {
       System.out.println("[EMAIL-OTP-EXEC] Attempting HTTPS Email send via Resend API (HTTPS Port 443)...");
@@ -851,11 +856,6 @@ public class EmailOtpService {
     if (!brevoKey.isBlank()) {
       System.out.println("[EMAIL-OTP-EXEC] Attempting HTTPS Email send via Brevo REST API (HTTPS Port 443)...");
       if (sendViaBrevo(to, otp, brevoKey)) return true;
-    }
-    String sgKey = resolveSendGridApiKey();
-    if (!sgKey.isBlank()) {
-      System.out.println("[EMAIL-OTP-EXEC] Attempting HTTPS Email send via SendGrid API (HTTPS Port 443)...");
-      if (sendViaSendGrid(to, otp, sgKey)) return true;
     }
     return false;
   }
@@ -936,6 +936,10 @@ public class EmailOtpService {
       if (resp.statusCode() >= 200 && resp.statusCode() < 300) {
         System.out.println("[EMAIL-OTP-HTTP-SUCCESS] Sent OTP to " + mask(to) + " via Resend API (HTTPS Port 443, from: " + formattedFrom + ")");
         return true;
+      } else if (resp.statusCode() == 403 && resp.body() != null && resp.body().contains("verify a domain")) {
+        System.err.println("[EMAIL-OTP-RESEND-DOMAIN-RESTRICTED] Resend rejected send to " + mask(to)
+            + " - free tier requires a verified domain to send to external recipients. Continuing to next provider.");
+        return false;
       } else {
         System.err.println("[EMAIL-OTP-HTTP-FAIL] Resend API status " + resp.statusCode() + ": " + resp.body());
         return false;
@@ -982,40 +986,49 @@ public class EmailOtpService {
 
   private void sendMail(String to, String otp) {
     System.out.println("=================================================");
-    System.out.println("[EMAIL-OTP-DISPATCH-START] Dispatching OTP for " + mask(to) + " via Resend HTTPS API (Port 443)...");
+    System.out.println("[EMAIL-OTP-DISPATCH-START] Dispatching OTP for " + mask(to) + " via SendGrid HTTPS API (Port 443)...");
     System.out.println("=================================================");
 
-    // Priority 1: Primary Method - Resend HTTPS API (HTTPS Port 443 - zero SMTP port blocks)
-    String resendKey = resolveResendApiKey();
-    if (!resendKey.isBlank()) {
-      System.out.println("[EMAIL-OTP-EXEC] Primary Method: Sending via Resend HTTPS API...");
-      if (sendViaResend(to, otp, resendKey)) {
+    // Priority 1: Primary Method - SendGrid HTTPS API (no domain verification required on free tier)
+    String sgKey = resolveSendGridApiKey();
+    if (!sgKey.isBlank()) {
+      System.out.println("[EMAIL-OTP-EXEC] Primary Method: Sending via SendGrid HTTPS API...");
+      if (sendViaSendGrid(to, otp, sgKey)) {
+        System.out.println("[EMAIL-OTP-PROVIDER-USED] SendGrid");
         return;
       }
+      System.err.println("[EMAIL-OTP-FALLBACK] SendGrid send failed. Falling back to Resend...");
+    } else {
+      System.out.println("[EMAIL-OTP-INFO] SENDGRID_API_KEY environment variable is not configured. Checking other HTTPS API / SMTP fallbacks...");
+    }
+
+    // Priority 2: Secondary Method - Resend HTTPS API (limited to verified domains / own address on free tier)
+    String resendKey = resolveResendApiKey();
+    if (!resendKey.isBlank()) {
+      System.out.println("[EMAIL-OTP-EXEC] Secondary Method: Sending via Resend HTTPS API...");
+      if (sendViaResend(to, otp, resendKey)) {
+        System.out.println("[EMAIL-OTP-PROVIDER-USED] Resend");
+        return;
+      }
+      System.err.println("[EMAIL-OTP-FALLBACK] Resend send failed (likely domain verification restriction on free tier). Continuing to next provider...");
     } else {
       System.out.println("[EMAIL-OTP-INFO] RESEND_API_KEY environment variable is not configured. Checking other HTTPS API / SMTP fallbacks...");
     }
 
-    // Priority 2: Secondary Method - SendGrid HTTPS API
-    String sgKey = resolveSendGridApiKey();
-    if (!sgKey.isBlank()) {
-      System.out.println("[EMAIL-OTP-EXEC] Secondary Method: Sending via SendGrid HTTPS API...");
-      if (sendViaSendGrid(to, otp, sgKey)) {
-        return;
-      }
-    }
-
-    // Priority 3: SMTP Fallback (Port 465 SSL / 587)
+    // Priority 3: Gmail SMTP - absolute last resort (Railway commonly blocks outbound SMTP ports)
+    System.out.println("[EMAIL-OTP-EXEC] Last Resort: Attempting Gmail SMTP fallback...");
     int primaryPort = 465;
     try { primaryPort = Integer.parseInt(mailPortStr.trim()); } catch (Exception ignored) {}
 
     if (trySendWithSender(mailSender, to, otp, "Primary Sender (Port " + primaryPort + ")")) {
+      System.out.println("[EMAIL-OTP-PROVIDER-USED] Gmail SMTP (Primary Sender, Port " + primaryPort + ")");
       return;
     }
 
     try {
       JavaMailSender gmail465 = buildGmailSender(465);
       if (trySendWithSender(gmail465, to, otp, "Gmail SMTP (Port 465 SSL)")) {
+        System.out.println("[EMAIL-OTP-PROVIDER-USED] Gmail SMTP (Port 465 SSL)");
         return;
       }
     } catch (Exception e) {
@@ -1025,6 +1038,7 @@ public class EmailOtpService {
     try {
       JavaMailSender gmail587 = buildGmailSender(587);
       if (trySendWithSender(gmail587, to, otp, "Gmail SMTP (Port 587 STARTTLS)")) {
+        System.out.println("[EMAIL-OTP-PROVIDER-USED] Gmail SMTP (Port 587 STARTTLS)");
         return;
       }
     } catch (Exception e) {
