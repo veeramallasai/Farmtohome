@@ -91,9 +91,27 @@ public class EmailOtpController {
   public ApiResponse<Map<String, Object>> verifyReset(
       @Valid @RequestBody EmailOtpDtos.VerifyResetRequest request) {
     String email = request.email().trim().toLowerCase();
-    log.info("[OTP-CONTROLLER] Received /verify-otp for email: {}", com.farmtohome.api.config.MailConfig.mask(email));
+    log.info("[OTP-CONTROLLER] Received /verify-reset or /reset-password for email: {}", com.farmtohome.api.config.MailConfig.mask(email));
+
+    String newPw = (request.newPassword() != null && !request.newPassword().isBlank())
+        ? request.newPassword().trim()
+        : (request.password() != null ? request.password().trim() : "");
+
+    if (!newPw.isBlank()) {
+      String tokenOrOtp = (request.resetToken() != null && !request.resetToken().isBlank())
+          ? request.resetToken().trim()
+          : (request.otpCode() != null && !request.otpCode().isBlank() ? request.otpCode().trim() : (request.otp() != null ? request.otp().trim() : ""));
+      return ApiResponse.ok(
+          service.resetPasswordForEmail(email, tokenOrOtp, newPw),
+          "Password reset successfully.");
+    }
+
+    String otpStr = (request.otp() != null && !request.otp().isBlank())
+        ? request.otp().trim()
+        : (request.otpCode() != null ? request.otpCode().trim() : "");
+
     return ApiResponse.ok(
-        service.verifyForEmail(email, request.otp().trim()),
+        service.verifyForEmail(email, otpStr),
         "Email verified successfully.");
   }
 

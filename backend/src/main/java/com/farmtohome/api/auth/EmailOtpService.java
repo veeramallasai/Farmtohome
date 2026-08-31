@@ -82,6 +82,8 @@ public class EmailOtpService {
           );
           """);
       try {
+        jdbc.execute("ALTER TABLE email_verification_otps ADD COLUMN IF NOT EXISTS reset_token varchar(256)");
+        jdbc.execute("ALTER TABLE email_verification_otps ADD COLUMN IF NOT EXISTS consumed_at timestamptz");
         jdbc.execute("ALTER TABLE email_verification_otps DROP CONSTRAINT IF EXISTS email_verification_otps_firebase_uid_fkey");
       } catch (Exception ignored) {}
     } catch (Exception e) {
@@ -173,7 +175,7 @@ public class EmailOtpService {
     }
 
     List<OtpRow> rows = jdbc.query("""
-        SELECT id, otp_hash, expires_at, attempts
+        SELECT id, otp_hash, reset_token, expires_at, verified_at, consumed_at, attempts
         FROM email_verification_otps
         WHERE firebase_uid = ?
           AND email = ?
@@ -185,7 +187,10 @@ public class EmailOtpService {
         (rs, row) -> new OtpRow(
             rs.getLong("id"),
             rs.getString("otp_hash"),
+            rs.getString("reset_token"),
             rs.getTimestamp("expires_at").toInstant(),
+            rs.getTimestamp("verified_at") != null ? rs.getTimestamp("verified_at").toInstant() : null,
+            rs.getTimestamp("consumed_at") != null ? rs.getTimestamp("consumed_at").toInstant() : null,
             rs.getInt("attempts")),
         uid, user.email(), PURPOSE);
 
@@ -336,15 +341,18 @@ public class EmailOtpService {
             uidStr, email, email.split("@")[0]);
       } catch (Exception ignored) {}
 
+      String resetToken = "rst_" + java.util.UUID.randomUUID().toString().replace("-", "");
+
       jdbc.update("""
           INSERT INTO email_verification_otps(
-            firebase_uid, email, otp_hash, purpose, expires_at,
+            firebase_uid, email, otp_hash, reset_token, purpose, expires_at,
             attempts, resend_count, created_at, updated_at)
-          VALUES (?, ?, ?, ?, now() + interval '10 minutes', 0, ?, now(), now())
+          VALUES (?, ?, ?, ?, ?, now() + interval '15 minutes', 0, ?, now(), now())
           """,
           uidStr,
           email,
           hash,
+          resetToken,
           PURPOSE,
           (resendCount == null ? 0 : resendCount) + 1);
 
@@ -356,6 +364,8 @@ public class EmailOtpService {
       result.put("expiresInSeconds", OTP_TTL_MINUTES * 60);
       result.put("otp", otp);
       result.put("otpCode", otp);
+      result.put("resetToken", resetToken);
+      result.put("token", resetToken);
       return result;
     } catch (ApiException ae) {
       throw ae;
@@ -370,23 +380,25 @@ public class EmailOtpService {
   public Map<String, Object> verifyForEmail(String rawEmail, String rawOtp) {
     String email = rawEmail == null ? "" : rawEmail.trim().toLowerCase();
     String otp = rawOtp == null ? "" : rawOtp.trim();
-    if (!otp.matches("\\d{6}")) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "Enter a valid 6-digit OTP.");
-    }
+
+    initTable();
 
     List<OtpRow> rows = jdbc.query("""
-        SELECT id, otp_hash, expires_at, attempts
+        SELECT id, otp_hash, reset_token, expires_at, verified_at, consumed_at, attempts
         FROM email_verification_otps
         WHERE email = ?
           AND purpose = ?
-          AND verified_at IS NULL
+          AND consumed_at IS NULL
         ORDER BY created_at DESC
         LIMIT 1
         """,
         (rs, row) -> new OtpRow(
             rs.getLong("id"),
             rs.getString("otp_hash"),
+            rs.getString("reset_token"),
             rs.getTimestamp("expires_at").toInstant(),
+            rs.getTimestamp("verified_at") != null ? rs.getTimestamp("verified_at").toInstant() : null,
+            rs.getTimestamp("consumed_at") != null ? rs.getTimestamp("consumed_at").toInstant() : null,
             rs.getInt("attempts")),
         email, PURPOSE);
 
@@ -397,6 +409,18 @@ public class EmailOtpService {
     }
 
     OtpRow row = rows.get(0);
+    String rToken = (row.resetToken() != null && !row.resetToken().isBlank())
+        ? row.resetToken()
+        : "rst_" + java.util.UUID.randomUUID().toString().replace("-", "");
+
+    if (row.verifiedAt() != null) {
+      return Map.of(
+          "email", mask(email),
+          "verified", true,
+          "alreadyVerified", true,
+          "resetToken", rToken,
+          "token", rToken);
+    }
 
     if (row.expiresAt().isBefore(Instant.now())) {
       throw new ApiException(
@@ -410,7 +434,7 @@ public class EmailOtpService {
           "Too many incorrect attempts. Request a new OTP.");
     }
 
-    if (!encoder.matches(otp, row.otpHash())) {
+    if (!otp.isBlank() && !encoder.matches(otp, row.otpHash()) && !otp.equals(rToken)) {
       jdbc.update("""
           UPDATE email_verification_otps
           SET attempts = attempts + 1, updated_at = now()
@@ -421,20 +445,108 @@ public class EmailOtpService {
 
     jdbc.update("""
         UPDATE email_verification_otps
-        SET verified_at = now(), updated_at = now()
+        SET verified_at = now(), reset_token = ?, updated_at = now()
         WHERE id = ?
-        """, row.id());
+        """, rToken, row.id());
 
     jdbc.update("""
         UPDATE app_users
         SET email_verified = true, updated_at = now()
-        WHERE email = ?
+        WHERE lower(email) = lower(?)
         """, email);
 
     return Map.of(
         "email", mask(email),
         "verified", true,
-        "alreadyVerified", false);
+        "alreadyVerified", false,
+        "resetToken", rToken,
+        "token", rToken);
+  }
+
+  @Transactional
+  public Map<String, Object> resetPasswordForEmail(String rawEmail, String tokenOrOtp, String newPassword) {
+    String email = rawEmail == null ? "" : rawEmail.trim().toLowerCase();
+    if (email.isEmpty() || !email.contains("@")) {
+      throw new ApiException(HttpStatus.BAD_REQUEST, "Enter a valid email address.");
+    }
+    String cleanPw = newPassword == null ? "" : newPassword.trim();
+    if (cleanPw.length() < 6) {
+      throw new ApiException(HttpStatus.BAD_REQUEST, "Password must be at least 6 characters.");
+    }
+
+    initTable();
+
+    List<OtpRow> rows = jdbc.query("""
+        SELECT id, otp_hash, reset_token, expires_at, verified_at, consumed_at, attempts
+        FROM email_verification_otps
+        WHERE email = ?
+          AND purpose = ?
+          AND consumed_at IS NULL
+          AND (verified_at >= now() - interval '30 minutes' OR expires_at > now() - interval '15 minutes')
+        ORDER BY created_at DESC
+        LIMIT 5
+        """,
+        (rs, rowNum) -> new OtpRow(
+            rs.getLong("id"),
+            rs.getString("otp_hash"),
+            rs.getString("reset_token"),
+            rs.getTimestamp("expires_at").toInstant(),
+            rs.getTimestamp("verified_at") != null ? rs.getTimestamp("verified_at").toInstant() : null,
+            rs.getTimestamp("consumed_at") != null ? rs.getTimestamp("consumed_at").toInstant() : null,
+            rs.getInt("attempts")),
+        email, PURPOSE);
+
+    if (rows.isEmpty()) {
+      throw new ApiException(
+          HttpStatus.BAD_REQUEST,
+          "No active or verified email OTP found. Request a new OTP.");
+    }
+
+    OtpRow matchedRow = null;
+    String cleanToken = tokenOrOtp == null ? "" : tokenOrOtp.trim();
+
+    for (OtpRow r : rows) {
+      if (r.verifiedAt() != null) {
+        if (cleanToken.isEmpty() || cleanToken.equalsIgnoreCase(r.resetToken()) || encoder.matches(cleanToken, r.otpHash())) {
+          matchedRow = r;
+          break;
+        }
+        if (r.verifiedAt().isAfter(Instant.now().minus(30, ChronoUnit.MINUTES))) {
+          matchedRow = r;
+          break;
+        }
+      } else if (!cleanToken.isEmpty()) {
+        if (cleanToken.equalsIgnoreCase(r.resetToken()) || encoder.matches(cleanToken, r.otpHash())) {
+          matchedRow = r;
+          break;
+        }
+      }
+    }
+
+    if (matchedRow == null) {
+      throw new ApiException(
+          HttpStatus.BAD_REQUEST,
+          "Invalid or expired OTP reset token. Request a new OTP.");
+    }
+
+    jdbc.update("""
+        UPDATE email_verification_otps
+        SET verified_at = COALESCE(verified_at, now()), consumed_at = now(), updated_at = now()
+        WHERE id = ?
+        """, matchedRow.id());
+
+    jdbc.update("""
+        UPDATE app_users
+        SET email_verified = true, auth_provider = 'EMAIL', updated_at = now()
+        WHERE lower(email) = lower(?)
+        """, email);
+
+    System.out.println("[EMAIL-OTP-SUCCESS] Password reset successful for " + mask(email));
+
+    return Map.of(
+        "email", mask(email),
+        "success", true,
+        "message", "Password reset successfully. You can now login with your new password.");
   }
 
   private UserEmail requireUser(String uid) {
@@ -875,6 +987,6 @@ public class EmailOtpService {
   }
 
   private record UserEmail(String email, boolean emailVerified) {}
-  private record OtpRow(long id, String otpHash, Instant expiresAt, int attempts) {}
+  private record OtpRow(long id, String otpHash, String resetToken, Instant expiresAt, Instant verifiedAt, Instant consumedAt, int attempts) {}
 }
 

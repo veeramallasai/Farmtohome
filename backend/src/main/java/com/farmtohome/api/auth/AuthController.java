@@ -126,13 +126,21 @@ public class AuthController {
   @PostMapping({"/reset-password", "/email-otp/reset-password", "/email-otp/verify-reset-password"})
   public ApiResponse<Map<String, Object>> resetPassword(
       @Valid @RequestBody AuthDtos.ResetPasswordRequest request) {
-    String otp = (request.otpCode() != null && !request.otpCode().isBlank())
-        ? request.otpCode().trim()
-        : (request.otp() != null ? request.otp().trim() : "");
-    Map<String, Object> response = emailOtpService.verifyForEmail(
-        request.email().trim().toLowerCase(), otp);
+    String email = request.email().trim().toLowerCase();
+    String newPw = (request.newPassword() != null && !request.newPassword().isBlank())
+        ? request.newPassword().trim()
+        : (request.password() != null ? request.password().trim() : "");
 
-    return ApiResponse.ok(response, "Password reset successfully.");
+    if (newPw.length() < 6) {
+      throw new ApiException(HttpStatus.BAD_REQUEST, "Password must be at least 6 characters.");
+    }
+
+    String tokenOrOtp = (request.resetToken() != null && !request.resetToken().isBlank())
+        ? request.resetToken().trim()
+        : (request.otpCode() != null && !request.otpCode().isBlank() ? request.otpCode().trim() : (request.otp() != null ? request.otp().trim() : ""));
+
+    Map<String, Object> response = emailOtpService.resetPasswordForEmail(email, tokenOrOtp, newPw);
+    return ApiResponse.ok(response, "Password reset successfully. You can now login with your new password.");
   }
 
   private ApiResponse<AuthDtos.AuthResponse> processUserLogin(
