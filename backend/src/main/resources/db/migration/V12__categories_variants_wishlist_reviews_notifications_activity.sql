@@ -25,8 +25,7 @@ VALUES
   ('grains', 'Grains & Pulses', 'ధాన్యాలు మరియు పప్పులు', 'assets/images/categories/grains.jpg', 'grain', 5),
   ('organic', 'Organic Special', 'సేంద్రీయ ఉత్పత్తులు', 'assets/images/categories/organic.jpg', 'spa', 6),
   ('exotic', 'Exotic Produce', 'విదేశీ కూరగాయలు', 'assets/images/categories/exotic.jpg', 'star', 7)
-ON CONFLICT (id) DO UPDATE SET 
-  telugu_name = EXCLUDED.telugu_name;
+ON CONFLICT (id) DO NOTHING;
 
 -- 2. Product Variants Table
 CREATE TABLE IF NOT EXISTS product_variants (
