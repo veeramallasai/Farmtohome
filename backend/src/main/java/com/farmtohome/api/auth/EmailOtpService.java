@@ -471,16 +471,41 @@ public class EmailOtpService {
 
     jdbc.update("""
         UPDATE app_users
-        SET email_verified = true, updated_at = now()
+        SET email_verified = true, active = true, updated_at = now()
         WHERE lower(email) = lower(?)
         """, email);
 
-    return Map.of(
-        "email", mask(email),
-        "verified", true,
-        "alreadyVerified", false,
-        "resetToken", rToken,
-        "token", rToken);
+    String uid = null;
+    String displayName = null;
+    String photoUrl = null;
+    try {
+      List<Map<String, Object>> uList = jdbc.queryForList(
+          "SELECT firebase_uid, display_name, photo_url FROM app_users WHERE lower(email) = lower(?) LIMIT 1",
+          email);
+      if (!uList.isEmpty()) {
+        uid = (String) uList.get(0).get("firebase_uid");
+        displayName = (String) uList.get(0).get("display_name");
+        photoUrl = (String) uList.get(0).get("photo_url");
+      }
+    } catch (Exception ignored) {}
+
+    String sessionToken = (uid != null && !uid.isBlank()) ? ("session_" + uid + "_" + System.currentTimeMillis()) : null;
+
+    Map<String, Object> result = new LinkedHashMap<>();
+    result.put("email", mask(email));
+    result.put("rawEmail", email);
+    result.put("verified", true);
+    result.put("alreadyVerified", false);
+    result.put("resetToken", rToken);
+    result.put("token", rToken);
+    if (sessionToken != null) {
+      result.put("accessToken", sessionToken);
+      result.put("userId", uid);
+      result.put("firebaseUid", uid);
+      result.put("displayName", displayName != null ? displayName : email.split("@")[0]);
+      result.put("photoUrl", photoUrl);
+    }
+    return result;
   }
 
   @Transactional

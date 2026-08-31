@@ -38,36 +38,70 @@ public class AuthController {
 
     Optional<AppUserEntity> entity = userRepository.findByEmail(email);
     if (entity.isEmpty()) {
-      // Auto-create user for frictionless login/testing if not existing
+      // Auto-provision unverified user profile and require OTP verification
       String uid = "usr_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
       String name = email.split("@")[0];
       AppUserEntity newUser = findOrCreateUserEntity(uid, email, name, null);
-      return processUserLogin(newUser.getFirebaseUid(), email, newUser.getDisplayName(), newUser.getPhotoUrl());
+      newUser.setEmailVerified(false);
+      newUser.setActive(false);
+      userRepository.save(newUser);
+
+      emailOtpService.sendForEmail(email);
+      throw new ApiException(HttpStatus.FORBIDDEN, "Account created. An OTP has been sent to your email for verification.");
     }
 
     AppUserEntity u = entity.get();
+    if (!u.isEmailVerified()) {
+      emailOtpService.sendForEmail(email);
+      throw new ApiException(HttpStatus.FORBIDDEN, "Your email is not verified yet. A new OTP has been sent to your email.");
+    }
+
+    if (!u.isActive()) {
+      u.setActive(true);
+      userRepository.save(u);
+    }
+
     return processUserLogin(u.getFirebaseUid(), email, u.getDisplayName(), u.getPhotoUrl());
   }
 
   @PostMapping("/register")
-  public ApiResponse<AuthDtos.AuthResponse> register(
+  public ApiResponse<Map<String, Object>> register(
       @Valid @RequestBody AuthDtos.RegisterRequest request) {
     String email = request.email().trim().toLowerCase();
 
-    if (userRepository.findByEmail(email).isPresent()) {
-      throw new ApiException(HttpStatus.CONFLICT, "An account already exists with this email.");
+    Optional<AppUserEntity> existingOpt = userRepository.findByEmail(email);
+    if (existingOpt.isPresent()) {
+      AppUserEntity existing = existingOpt.get();
+      if (existing.isEmailVerified()) {
+        throw new ApiException(HttpStatus.CONFLICT, "An account already exists with this email. Please login.");
+      }
     }
 
-    String uid = "usr_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+    String uid = existingOpt.map(AppUserEntity::getFirebaseUid)
+        .orElseGet(() -> "usr_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16));
     String name = ((request.firstName() != null ? request.firstName() : "") + " " + (request.lastName() != null ? request.lastName() : "")).trim();
     if (name.isEmpty()) name = email.split("@")[0];
 
-    AppUserEntity entity = findOrCreateUserEntity(uid, email, name, null);
+    AppUserEntity entity = existingOpt.orElseGet(() -> findOrCreateUserEntity(uid, email, name, null));
     if (request.firstName() != null) entity.setFirstName(request.firstName());
     if (request.lastName() != null) entity.setLastName(request.lastName());
+    entity.setEmailVerified(false);
+    entity.setActive(false);
+    entity.setAuthProvider("EMAIL");
     userRepository.save(entity);
 
-    return processUserLogin(uid, email, entity.getDisplayName(), entity.getPhotoUrl());
+    Map<String, Object> otpResult = emailOtpService.sendForEmail(email);
+
+    Map<String, Object> response = new java.util.LinkedHashMap<>();
+    response.put("email", email);
+    response.put("maskedEmail", com.farmtohome.api.config.MailConfig.mask(email));
+    response.put("requiresEmailVerification", true);
+    response.put("message", "Registration successful. Please verify the OTP sent to your email.");
+    if (otpResult.containsKey("otp")) response.put("otp", otpResult.get("otp"));
+    if (otpResult.containsKey("otpCode")) response.put("otpCode", otpResult.get("otpCode"));
+    if (otpResult.containsKey("expiresInSeconds")) response.put("expiresInSeconds", otpResult.get("expiresInSeconds"));
+
+    return ApiResponse.ok(response, "Registration successful. Please verify the OTP sent to your email.");
   }
 
   @PostMapping({"/social-login", "/google", "/google-login", "/google/login", "/google-signin", "/social", "/social/login"})
