@@ -11,17 +11,24 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD:${PGPASSWORD:${POSTGRES_PASSWORD:root}}}}
     driver-class-name: org.postgresql.Driver
     hikari:
+      pool-name: FarmToHomeHikariCP
       maximum-pool-size: ${DB_POOL_SIZE:10}
-      minimum-idle: 2
+      minimum-idle: ${DB_MIN_IDLE:2}
+      idle-timeout: 300000
+      max-lifetime: 600000
       connection-timeout: 20000
+      validation-timeout: 5000
+      leak-detection-threshold: 15000
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     properties:
       hibernate:
         jdbc:
           time_zone: UTC
+          lob:
+            non_contextual_creation: true
   flyway:
     enabled: true
     baseline-on-migrate: true

@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/cart")
+@RequestMapping({"/api/v1/cart", "/v1/cart"})
 public class CartController {
   private final CartService cart;
 
@@ -23,7 +23,7 @@ public class CartController {
 
   @GetMapping
   ApiResponse<CartDtos.Cart> get(Principal principal) {
-    return ApiResponse.ok(cart.view(principal.getName()));
+    return ApiResponse.ok(cart.view(principal != null ? principal.getName() : "guest_user"));
   }
 
   @PostMapping("/items")
