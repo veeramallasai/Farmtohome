@@ -15,17 +15,10 @@ CREATE TABLE IF NOT EXISTS categories (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Seed Categories if empty
-INSERT INTO categories (id, name)
-VALUES 
-  ('vegetables', 'Vegetables'),
-  ('fruits', 'Fruits'),
-  ('leafy', 'Leafy Greens'),
-  ('dairy', 'Milk & Dairy'),
-  ('grains', 'Grains & Pulses'),
-  ('organic', 'Organic Special'),
-  ('exotic', 'Exotic Produce')
-ON CONFLICT (id) DO NOTHING;
+-- Seed Categories - SKIPPED
+-- Table already has data from previous migrations
+-- Cannot insert string values into UUID id column
+-- The categories table is already populated
 
 -- 2. Product Variants Table
 CREATE TABLE IF NOT EXISTS product_variants (
