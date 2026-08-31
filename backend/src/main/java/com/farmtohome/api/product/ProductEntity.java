@@ -73,13 +73,32 @@ public class ProductEntity {
   public boolean isActive() { return active; }
   public boolean isFresh() { return fresh; }
   public boolean isAvailable() { return available; }
-  public void setAvailable(boolean available) { this.available = available; }
   public boolean isDeleted() { return deleted; }
-  public void setDeleted(boolean deleted) { this.deleted = deleted; }
   public BigDecimal getRating() { return rating; }
   public int getReviewCount() { return reviewCount; }
   public Instant getCreatedAt() { return createdAt; }
   public Instant getUpdatedAt() { return updatedAt; }
+
+  public void setId(String id) { this.id = id; }
+  public void setName(String name) { this.name = name; }
+  public void setEnglishName(String englishName) { this.englishName = englishName; }
+  public void setTeluguName(String teluguName) { this.teluguName = teluguName; }
+  public void setDescription(String description) { this.description = description; }
+  public void setCategory(String category) { this.category = category; }
+  public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+  public void setUnit(String unit) { this.unit = unit; }
+  public void setPrice(BigDecimal price) { this.price = price; }
+  public void setMrp(BigDecimal mrp) { this.mrp = mrp; }
+  public void setShopUnit(String shopUnit) { this.shopUnit = shopUnit; }
+  public void setShopPrice(BigDecimal shopPrice) { this.shopPrice = shopPrice; }
+  public void setShopMrp(BigDecimal shopMrp) { this.shopMrp = shopMrp; }
   public void setStockQuantity(int stockQuantity) { this.stockQuantity = stockQuantity; }
+  public void setActive(boolean active) { this.active = active; }
+  public void setFresh(boolean fresh) { this.fresh = fresh; }
+  public void setAvailable(boolean available) { this.available = available; }
+  public void setDeleted(boolean deleted) { this.deleted = deleted; }
+  public void setRating(BigDecimal rating) { this.rating = rating; }
+  public void setReviewCount(int reviewCount) { this.reviewCount = reviewCount; }
+  public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
   public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
 }

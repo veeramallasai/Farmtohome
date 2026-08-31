@@ -1,4 +1,4 @@
-# Script to commit and push all recent PostgreSQL connection fixes, Flyway migrations, and backend/frontend APIs to GitHub
+# Script to commit and push ProductEntity setter fix and full real-time API sync to GitHub
 
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -ErrorAction SilentlyContinue
 
@@ -13,7 +13,7 @@ Write-Host "[2/4] Staging all modified and new files..." -ForegroundColor Yellow
 git add .
 
 Write-Host "[3/4] Committing changes..." -ForegroundColor Yellow
-git commit -m "feat: fix PostgreSQL connection pool, add Flyway V12 migration, and full real-time API sync"
+git commit -m "fix(backend): add missing setRating and setReviewCount setters to ProductEntity for clean build and Railway deployment"
 
 Write-Host "[4/4] Pushing to GitHub (origin main)..." -ForegroundColor Yellow
 git push origin main
