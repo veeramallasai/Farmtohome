@@ -16,15 +16,15 @@ CREATE TABLE IF NOT EXISTS categories (
 );
 
 -- Seed Categories if empty
-INSERT INTO categories (id, name, telugu_name, image_url, icon_name, display_order)
+INSERT INTO categories (id, name, image_url, icon_name, display_order)
 VALUES 
-  ('vegetables', 'Vegetables', 'కూరగాయలు', 'assets/images/categories/vegetables.jpg', 'eco', 1),
-  ('fruits', 'Fruits', 'పండ్లు', 'assets/images/categories/fruits.jpg', 'apple', 2),
-  ('leafy', 'Leafy Greens', 'ఆకుకూరలు', 'assets/images/categories/leafy.jpg', 'grass', 3),
-  ('dairy', 'Milk & Dairy', 'పాలు మరియు నెయ్యి', 'assets/images/categories/dairy.jpg', 'local_drink', 4),
-  ('grains', 'Grains & Pulses', 'ధాన్యాలు మరియు పప్పులు', 'assets/images/categories/grains.jpg', 'grain', 5),
-  ('organic', 'Organic Special', 'సేంద్రీయ ఉత్పత్తులు', 'assets/images/categories/organic.jpg', 'spa', 6),
-  ('exotic', 'Exotic Produce', 'విదేశీ కూరగాయలు', 'assets/images/categories/exotic.jpg', 'star', 7)
+  ('vegetables', 'Vegetables', 'assets/images/categories/vegetables.jpg', 'eco', 1),
+  ('fruits', 'Fruits', 'assets/images/categories/fruits.jpg', 'apple', 2),
+  ('leafy', 'Leafy Greens', 'assets/images/categories/leafy.jpg', 'grass', 3),
+  ('dairy', 'Milk & Dairy', 'assets/images/categories/dairy.jpg', 'local_drink', 4),
+  ('grains', 'Grains & Pulses', 'assets/images/categories/grains.jpg', 'grain', 5),
+  ('organic', 'Organic Special', 'assets/images/categories/organic.jpg', 'spa', 6),
+  ('exotic', 'Exotic Produce', 'assets/images/categories/exotic.jpg', 'star', 7)
 ON CONFLICT (id) DO NOTHING;
 
 -- 2. Product Variants Table
