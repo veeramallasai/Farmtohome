@@ -29,6 +29,13 @@ public class AuthDtos {
       String credential
   ) {}
 
+  public record GoogleOAuthRequest(
+      String idToken,
+      String email,
+      String name,
+      String photoUrl
+  ) {}
+
   public record ForgotPasswordRequest(
       @NotBlank @Email String email
   ) {}

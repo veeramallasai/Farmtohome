@@ -15,6 +15,14 @@ class AppConfig {
     defaultValue: '1',
   );
 
+  /// OAuth 2.0 Web Client ID from Google Cloud Console. Configure this via
+  /// `--dart-define=GOOGLE_OAUTH_CLIENT_ID=your-client-id.apps.googleusercontent.com`
+  /// when building/running the app.
+  static const String googleOAuthClientId = String.fromEnvironment(
+    'GOOGLE_OAUTH_CLIENT_ID',
+    defaultValue: '',
+  );
+
   static String get environment => EnvironmentConfig.name;
   static String get apiBaseUrl => BackendConfig.baseUrl;
   static bool get isProduction => EnvironmentConfig.isProduction;
