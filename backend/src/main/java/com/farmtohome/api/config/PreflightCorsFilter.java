@@ -1,40 +1,74 @@
 package com.farmtohome.api.config;
 
+import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.CorsFilter;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
- * Filter placed at HIGHEST_PRECEDENCE using Spring's official CorsFilter to handle CORS
- * preflight OPTIONS and cross-origin requests cleanly without header duplication.
+ * Handles preflight requests before MVC/security routing so auth endpoints always emit CORS headers.
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
-public class PreflightCorsFilter extends CorsFilter {
+public class PreflightCorsFilter extends OncePerRequestFilter {
 
-    public PreflightCorsFilter() {
-        super(createCorsConfigurationSource());
+    private final List<String> allowedOriginPatterns;
+
+    public PreflightCorsFilter(
+            @Value("${app.cors-origins:https://flutter-frontend-production-1590.up.railway.app,https://flutter-frontend-production-e8d6.up.railway.app,https://*.up.railway.app,https://*.railway.app,http://localhost:*,http://127.0.0.1:*}")
+            String corsOrigins) {
+        this.allowedOriginPatterns = Arrays.stream(corsOrigins.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .toList();
     }
 
-    private static UrlBasedCorsConfigurationSource createCorsConfigurationSource() {
-        CorsConfiguration config = new CorsConfiguration();
-        config.setAllowCredentials(true);
-        config.addAllowedOriginPattern("*");
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Requested-With", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", "*"));
-        config.setExposedHeaders(List.of(
-            "Authorization", "Content-Type", "X-Total-Count", 
-            "Access-Control-Allow-Origin", "Access-Control-Allow-Credentials"
-        ));
-        config.setMaxAge(3600L);
+    @Override
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain) throws ServletException, IOException {
+        String origin = request.getHeader(HttpHeaders.ORIGIN);
+        if (origin != null && isAllowedOrigin(origin)) {
+            response.setHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, origin);
+            response.setHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true");
+            response.setHeader(HttpHeaders.VARY, "Origin");
+            response.setHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, "GET,POST,PUT,PATCH,DELETE,OPTIONS,HEAD");
+            response.setHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS,
+                "Authorization,Content-Type,Accept,X-Requested-With,Origin,Access-Control-Request-Method,Access-Control-Request-Headers");
+            response.setHeader(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, "Authorization,Content-Type,X-Total-Count");
+            response.setHeader(HttpHeaders.ACCESS_CONTROL_MAX_AGE, "3600");
+        }
 
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-        return source;
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            response.setStatus(HttpStatus.NO_CONTENT.value());
+            return;
+        }
+
+        filterChain.doFilter(request, response);
+    }
+
+    private boolean isAllowedOrigin(String origin) {
+        return allowedOriginPatterns.stream().anyMatch(pattern -> matches(pattern, origin));
+    }
+
+    private boolean matches(String pattern, String origin) {
+        if ("*".equals(pattern)) return true;
+        if (pattern.equalsIgnoreCase(origin)) return true;
+        String regex = "^" + java.util.regex.Pattern.quote(pattern).replace("\\*", ".*") + "$";
+        return origin.matches(regex);
     }
 }
 
