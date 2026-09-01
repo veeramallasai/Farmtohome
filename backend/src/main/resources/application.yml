@@ -72,7 +72,9 @@ management:
         enabled: true
 
 app:
-  cors-origins: "${CORS_ORIGINS:https://flutter-frontend-production-1590.up.railway.app,https://flutter-frontend-production-e8d6.up.railway.app,https://*.railway.app,https://*.up.railway.app,http://localhost:*,http://127.0.0.1:*}"
+  # NOTE: CORS is no longer configured via this Spring property. PreflightCorsFilter reads
+  # allowed origins directly from the APP_CORS_ORIGINS / CORS_ORIGINS / CORS_ALLOWED_ORIGINS
+  # environment variables at runtime. See PreflightCorsFilter.java for details.
   mail-from: ${APP_MAIL_FROM:${MAIL_FROM:${spring.mail.username:${SPRING_MAIL_USERNAME:veeramallasaipichaiah456@gmail.com}}}}
   resend-from-email: ${RESEND_FROM_EMAIL:onboarding@resend.dev}
   google:
@@ -87,3 +89,4 @@ logging:
   level:
     root: INFO
     org.springframework.security: WARN
+    com.farmtohome.api.config.PreflightCorsFilter: DEBUG
