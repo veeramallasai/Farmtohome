@@ -16,6 +16,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
 
+  private final JwtService jwtService;
+
+  public JwtAuthFilter(JwtService jwtService) {
+    this.jwtService = jwtService;
+  }
+
   @Override
   protected void doFilterInternal(
       HttpServletRequest request,
@@ -34,14 +40,17 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     String tokenStr = authorization.substring(7).trim();
     if (!tokenStr.isEmpty()) {
-      List<SimpleGrantedAuthority> authorities = new ArrayList<>();
-      authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
-      if (tokenStr.toLowerCase().contains("admin")) {
-        authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
+      JwtService.VerifiedJwt verifiedJwt = jwtService.verify(tokenStr);
+      if (verifiedJwt != null) {
+        List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+        authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
+        if (verifiedJwt.subject().toLowerCase().contains("admin")) {
+          authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        }
+        var authentication = new UsernamePasswordAuthenticationToken(
+            verifiedJwt.subject(), tokenStr, authorities);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
       }
-      var authentication = new UsernamePasswordAuthenticationToken(
-          tokenStr, tokenStr, authorities);
-      SecurityContextHolder.getContext().setAuthentication(authentication);
     }
     filterChain.doFilter(request, response);
   }

@@ -75,6 +75,12 @@ app:
   cors-origins: "${CORS_ORIGINS:https://flutter-frontend-production-e8d6.up.railway.app,https://*.railway.app,https://*.up.railway.app,http://localhost:*,*}"
   mail-from: ${APP_MAIL_FROM:${MAIL_FROM:${spring.mail.username:${SPRING_MAIL_USERNAME:veeramallasaipichaiah456@gmail.com}}}}
   resend-from-email: ${RESEND_FROM_EMAIL:onboarding@resend.dev}
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:${GOOGLE_WEB_CLIENT_ID:1066615778167-ochceogaf54rramkojskbrbqlkfr3fi6.apps.googleusercontent.com}}
+  jwt:
+    issuer: ${APP_JWT_ISSUER:farm-to-home-api}
+    secret: ${APP_JWT_SECRET:farm-to-home-development-secret-change-in-production-32chars}
+    expiration-seconds: ${APP_JWT_EXPIRATION_SECONDS:86400}
 
 
 logging:

@@ -81,6 +81,7 @@ class AppRouter {
         );
 
       case AppRoutes.home:
+      case AppRoutes.dashboard:
         return _page(const HomeScreen(), settings);
 
       case AppRoutes.deliveryPartner:

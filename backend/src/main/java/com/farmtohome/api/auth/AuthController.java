@@ -5,12 +5,10 @@ import com.farmtohome.api.common.ApiResponse;
 import com.farmtohome.api.user.AppUserEntity;
 import com.farmtohome.api.user.AppUserRepository;
 import jakarta.validation.Valid;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -18,17 +16,23 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/auth")
+@RequestMapping({"/api/v1/auth", "/v1/auth", "/auth"})
 public class AuthController {
 
   private final AppUserRepository userRepository;
   private final EmailOtpService emailOtpService;
+  private final GoogleTokenVerifierService googleTokenVerifierService;
+  private final JwtService jwtService;
 
   public AuthController(
       AppUserRepository userRepository,
-      EmailOtpService emailOtpService) {
+      EmailOtpService emailOtpService,
+      GoogleTokenVerifierService googleTokenVerifierService,
+      JwtService jwtService) {
     this.userRepository = userRepository;
     this.emailOtpService = emailOtpService;
+    this.googleTokenVerifierService = googleTokenVerifierService;
+    this.jwtService = jwtService;
   }
 
   @PostMapping("/login")
@@ -113,36 +117,44 @@ public class AuthController {
         ? (request.idToken() != null ? request.idToken() : (request.token() != null ? request.token() : request.credential()))
         : null;
 
-    Map<String, Object> tokenClaims = parseJwtClaims(rawToken);
+    if (rawToken == null || rawToken.isBlank()) {
+      throw new ApiException(HttpStatus.UNAUTHORIZED, "Google ID token is required.");
+    }
+
+    GoogleTokenVerifierService.GoogleUser googleUser = googleTokenVerifierService.verify(rawToken);
 
     String email = (request != null && request.email() != null && !request.email().isBlank())
         ? request.email().trim().toLowerCase()
-        : (tokenClaims.containsKey("email") ? tokenClaims.get("email").toString().trim().toLowerCase() : null);
+        : googleUser.email();
 
-    if (email == null || email.isBlank()) {
-      email = "user_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8) + "@gmail.com";
+    if (email == null || email.isBlank() || !email.equalsIgnoreCase(googleUser.email())) {
+      throw new ApiException(HttpStatus.UNAUTHORIZED, "Google account email could not be verified.");
     }
 
     Optional<AppUserEntity> existing = userRepository.findByEmail(email);
     String uid = existing.map(AppUserEntity::getFirebaseUid)
-        .orElseGet(() -> "soc_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16));
+        .orElse("google_" + googleUser.subject());
 
     String firstName = (request != null && request.firstName() != null) ? request.firstName() : "";
     String lastName = (request != null && request.lastName() != null) ? request.lastName() : "";
     String name = (firstName + " " + lastName).trim();
 
-    if (name.isEmpty() && tokenClaims.containsKey("name")) {
-      name = tokenClaims.get("name").toString().trim();
+    if (name.isEmpty() && googleUser.name() != null) {
+      name = googleUser.name().trim();
     }
     if (name.isEmpty()) name = email.split("@")[0];
 
     String photo = (request != null && request.photoUrl() != null) ? request.photoUrl() : null;
-    if ((photo == null || photo.isBlank()) && tokenClaims.containsKey("picture")) {
-      photo = tokenClaims.get("picture").toString().trim();
+    if ((photo == null || photo.isBlank()) && googleUser.picture() != null) {
+      photo = googleUser.picture().trim();
     }
 
     AppUserEntity entity = findOrCreateUserEntity(uid, email, name, photo);
     entity.setAuthProvider(prov);
+    entity.setEmailVerified(true);
+    entity.setActive(true);
+    entity.setDisplayName(name);
+    entity.setPhotoUrl(photo);
     userRepository.save(entity);
 
     return processUserLogin(uid, email, entity.getDisplayName(), entity.getPhotoUrl());
@@ -177,7 +189,7 @@ public class AuthController {
 
   private ApiResponse<AuthDtos.AuthResponse> processUserLogin(
       String uid, String email, String name, String photoUrl) {
-    String token = "session_" + uid + "_" + System.currentTimeMillis();
+    String token = jwtService.generateToken(uid, email, name, photoUrl);
 
     userRepository.findById(uid).ifPresent(user -> {
       user.setLastLoginAt(Instant.now());
@@ -208,16 +220,4 @@ public class AuthController {
     });
   }
 
-  private Map<String, Object> parseJwtClaims(String token) {
-    if (token == null || token.isBlank()) return Map.of();
-    try {
-      String[] parts = token.split("\\.");
-      if (parts.length < 2) return Map.of();
-      String payload = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
-      com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-      return mapper.readValue(payload, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-    } catch (Exception e) {
-      return Map.of();
-    }
-  }
 }

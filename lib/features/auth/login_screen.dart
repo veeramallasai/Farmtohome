@@ -26,6 +26,8 @@ class _LoginScreenState extends State<LoginScreen>
   static const Color _muted = Color(0xFF666666);
   static const Color _border = Color(0xFFE0E3E0);
   static const Color _error = Color(0xFFD32F2F);
+  static const String _googleServerClientId =
+      '1066615778167-ochceogaf54rramkojskbrbqlkfr3fi6.apps.googleusercontent.com';
 
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _identifierController = TextEditingController();
@@ -135,7 +137,7 @@ class _LoginScreenState extends State<LoginScreen>
 
       await UserRepository().syncCurrentUser();
       if (!mounted) return;
-      Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+      Navigator.of(context).pushReplacementNamed(AppRoutes.dashboard);
     } on BackendAuthException catch (error) {
       if (mounted) _showError(_authErrorMessage(error));
     } catch (_) {
@@ -155,6 +157,7 @@ class _LoginScreenState extends State<LoginScreen>
 
     try {
       final GoogleSignIn googleSignIn = GoogleSignIn(
+        serverClientId: _googleServerClientId,
         scopes: <String>['email', 'profile'],
       );
 
@@ -410,7 +413,7 @@ class _LoginScreenState extends State<LoginScreen>
 
     await UserRepository().syncCurrentUser();
     if (!mounted) return;
-    Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+    Navigator.of(context).pushReplacementNamed(AppRoutes.dashboard);
   }
 
   String _authErrorMessage(BackendAuthException error) {

@@ -295,6 +295,7 @@ class BackendAuth {
       uid: (claims['sub'] ?? data['userId'] ?? email).toString(),
       email: (data['email'] ?? email).toString(),
       displayName: (data['name'] ?? '').toString(),
+      photoURL: (data['photoUrl'] ?? claims['picture'] ?? '').toString(),
     );
     _changes.add(_currentUser);
     return UserCredential(_currentUser);

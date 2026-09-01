@@ -37,7 +37,7 @@ public class SecurityConfig {
         .authorizeHttpRequests(auth -> auth
             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
             .requestMatchers("/actuator", "/actuator/**", "/health", "/error").permitAll()
-            .requestMatchers("/api/v1/auth/**", "/v1/auth/**").permitAll()
+            .requestMatchers("/api/v1/auth/**", "/v1/auth/**", "/auth/**").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/v1/catalog/**", "/v1/catalog/**", "/api/v1/products/**", "/v1/products/**", "/api/v1/categories/**", "/v1/categories/**", "/api/v1/offers", "/v1/offers", "/api/v1/farmers/**", "/v1/farmers/**", "/api/v1/delivery-slots", "/v1/delivery-slots").permitAll()
             .anyRequest().permitAll())
         .exceptionHandling(exceptions -> exceptions
