@@ -72,7 +72,7 @@ management:
         enabled: true
 
 app:
-  cors-origins: "${CORS_ORIGINS:https://flutter-frontend-production-1590.up.railway.app,https://flutter-frontend-production-e8d6.up.railway.app,https://*.railway.app,https://*.up.railway.app,http://localhost:*,http://127.0.0.1:*,*}"
+  cors-origins: "${APP_CORS_ORIGINS:${CORS_ORIGINS:https://flutter-frontend-production-1590.up.railway.app,https://flutter-frontend-production-e8d6.up.railway.app,https://*.up.railway.app,https://*.railway.app,http://localhost:*,http://127.0.0.1:*}}"
   mail-from: ${APP_MAIL_FROM:${MAIL_FROM:${SPRING_MAIL_USERNAME:veeramallasaipichaiah456@gmail.com}}}
   resend-from-email: ${RESEND_FROM_EMAIL:onboarding@resend.dev}
   google:
