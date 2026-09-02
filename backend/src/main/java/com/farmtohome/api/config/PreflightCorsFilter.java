@@ -3,8 +3,10 @@ package com.farmtohome.api.config;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Pattern;
 
-import org.springframework.beans.factory.annotation.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
@@ -18,21 +20,59 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 /**
- * Handles preflight requests before MVC/security routing so auth endpoints always emit CORS headers.
+ * Handles preflight requests before MVC/security routing so auth endpoints always emit CORS
+ * headers. Reads allowed origins directly from environment variables (not Spring properties)
+ * because Railway injects credentials as environment variables at runtime, and any stale
+ * application.yml default should never be able to shadow them.
+ *
+ * <p>Resolution order: {@code APP_CORS_ORIGINS} -&gt; {@code CORS_ORIGINS} -&gt;
+ * {@code CORS_ALLOWED_ORIGINS} -&gt; hardcoded default.
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class PreflightCorsFilter extends OncePerRequestFilter {
 
+    private static final Logger log = LoggerFactory.getLogger(PreflightCorsFilter.class);
+
+    private static final String DEFAULT_ORIGINS =
+            "https://flutter-frontend-production-1590.up.railway.app,"
+                    + "https://flutter-frontend-production-e8d6.up.railway.app,"
+                    + "https://*.up.railway.app,"
+                    + "https://*.railway.app,"
+                    + "http://localhost:*,"
+                    + "http://127.0.0.1:*";
+
     private final List<String> allowedOriginPatterns;
 
-    public PreflightCorsFilter(
-            @Value("${app.cors-origins:https://flutter-frontend-production-1590.up.railway.app,https://flutter-frontend-production-e8d6.up.railway.app,https://*.up.railway.app,https://*.railway.app,http://localhost:*,http://127.0.0.1:*,*}")
-            String corsOrigins) {
-        this.allowedOriginPatterns = Arrays.stream(corsOrigins.split(","))
+    public PreflightCorsFilter() {
+        this(System.getenv("APP_CORS_ORIGINS"), System.getenv("CORS_ORIGINS"), System.getenv("CORS_ALLOWED_ORIGINS"));
+    }
+
+    PreflightCorsFilter(String appCorsOrigins, String corsOrigins, String corsAllowedOrigins) {
+        String resolved;
+        String source;
+
+        if (appCorsOrigins != null && !appCorsOrigins.isBlank()) {
+            resolved = appCorsOrigins;
+            source = "APP_CORS_ORIGINS";
+        } else if (corsOrigins != null && !corsOrigins.isBlank()) {
+            resolved = corsOrigins;
+            source = "CORS_ORIGINS";
+        } else if (corsAllowedOrigins != null && !corsAllowedOrigins.isBlank()) {
+            resolved = corsAllowedOrigins;
+            source = "CORS_ALLOWED_ORIGINS";
+        } else {
+            resolved = DEFAULT_ORIGINS;
+            source = "hardcoded default";
+        }
+
+        this.allowedOriginPatterns = Arrays.stream(resolved.split(","))
                 .map(String::trim)
                 .filter(value -> !value.isBlank())
                 .toList();
+
+        log.info("PreflightCorsFilter initialized using {} -> allowed origin patterns: {}",
+                source, allowedOriginPatterns);
     }
 
     @Override
@@ -41,7 +81,14 @@ public class PreflightCorsFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
         String origin = request.getHeader(HttpHeaders.ORIGIN);
-        if (origin != null && isAllowedOrigin(origin)) {
+        boolean allowed = origin != null && isAllowedOrigin(origin);
+
+        if (origin != null) {
+            log.info("CORS check for request {} {} -> origin='{}' allowed={}",
+                    request.getMethod(), request.getRequestURI(), origin, allowed);
+        }
+
+        if (allowed) {
             response.setHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, origin);
             response.setHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true");
             response.setHeader(HttpHeaders.VARY, "Origin");
@@ -64,21 +111,30 @@ public class PreflightCorsFilter extends OncePerRequestFilter {
         return allowedOriginPatterns.stream().anyMatch(pattern -> matches(pattern, origin));
     }
 
+    /**
+     * Matches an origin against a pattern that may contain {@code *} wildcards, e.g.
+     * {@code https://*.up.railway.app} or {@code http://localhost:*}. Each {@code *} is
+     * translated into a {@code .*} regex segment, with the rest of the pattern escaped so
+     * literal characters (dots, colons, slashes) are matched exactly.
+     */
     private boolean matches(String pattern, String origin) {
-        if ("*".equals(pattern)) return true;
-        if (pattern.equalsIgnoreCase(origin)) return true;
+        if ("*".equals(pattern)) {
+            return true;
+        }
+        if (pattern.equalsIgnoreCase(origin)) {
+            return true;
+        }
 
         String[] parts = pattern.split("\\*", -1);
-        StringBuilder sb = new StringBuilder("^");
+        StringBuilder regex = new StringBuilder("^");
         for (int i = 0; i < parts.length; i++) {
             if (i > 0) {
-                sb.append(".*");
+                regex.append(".*");
             }
-            sb.append(java.util.regex.Pattern.quote(parts[i]));
+            regex.append(Pattern.quote(parts[i]));
         }
-        sb.append("$");
-        return origin.matches(sb.toString());
+        regex.append("$");
+
+        return Pattern.compile(regex.toString(), Pattern.CASE_INSENSITIVE).matcher(origin).matches();
     }
 }
-
-

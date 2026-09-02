@@ -72,7 +72,9 @@ management:
         enabled: true
 
 app:
-  cors-origins: "${CORS_ORIGINS:https://flutter-frontend-production-1590.up.railway.app,https://flutter-frontend-production-e8d6.up.railway.app,https://*.railway.app,https://*.up.railway.app,http://localhost:*,http://127.0.0.1:*,*}"
+  # CORS origins are resolved exclusively by PreflightCorsFilter directly from the
+  # APP_CORS_ORIGINS / CORS_ORIGINS / CORS_ALLOWED_ORIGINS environment variables at runtime.
+  # Intentionally left unset here so no stale application.yml default can shadow them.
   mail-from: ${APP_MAIL_FROM:${MAIL_FROM:${SPRING_MAIL_USERNAME:veeramallasaipichaiah456@gmail.com}}}
   resend-from-email: ${RESEND_FROM_EMAIL:onboarding@resend.dev}
   google:

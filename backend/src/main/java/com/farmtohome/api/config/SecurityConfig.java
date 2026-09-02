@@ -1,13 +1,8 @@
 package com.farmtohome.api.config;
 
 import com.farmtohome.api.auth.JwtAuthFilter;
-import java.util.Arrays;
-import java.util.List;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -16,25 +11,21 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.CorsFilter;
 
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
 
-  @Value("${app.cors-origins:https://flutter-frontend-production-1590.up.railway.app,https://flutter-frontend-production-e8d6.up.railway.app,https://*.up.railway.app,https://*.railway.app,http://localhost:*,http://127.0.0.1:*,*}")
-  private String corsOrigins;
-
+  // CORS is handled exclusively by PreflightCorsFilter (HIGHEST_PRECEDENCE), which reads
+  // allowed origins from environment variables. Spring Security's built-in CORS support is
+  // disabled here so there is only one source of truth for CORS headers.
   @Bean
   SecurityFilterChain securityFilterChain(
       HttpSecurity http,
       JwtAuthFilter jwtAuthFilter) throws Exception {
     return http
         .csrf(csrf -> csrf.disable())
-        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+        .cors(cors -> cors.disable())
         .sessionManagement(session ->
             session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(auth -> auth
@@ -67,28 +58,5 @@ public class SecurityConfig {
     return username -> {
       throw new UsernameNotFoundException("Password login is not enabled on this API.");
     };
-  }
-
-  @Bean
-  CorsConfigurationSource corsConfigurationSource() {
-    CorsConfiguration configuration = new CorsConfiguration();
-    List<String> origins = Arrays.stream(corsOrigins.split(","))
-        .map(String::trim)
-        .filter(value -> !value.isBlank())
-        .toList();
-
-    configuration.setAllowedOriginPatterns(origins);
-    configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"));
-    configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Requested-With", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", "*"));
-    configuration.setExposedHeaders(List.of(
-        "Authorization", "Content-Type", "X-Total-Count", 
-        "Access-Control-Allow-Origin", "Access-Control-Allow-Credentials"
-    ));
-    configuration.setAllowCredentials(true);
-    configuration.setMaxAge(3600L);
-
-    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-    source.registerCorsConfiguration("/**", configuration);
-    return source;
   }
 }
