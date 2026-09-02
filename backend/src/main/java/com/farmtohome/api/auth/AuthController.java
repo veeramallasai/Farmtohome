@@ -9,6 +9,8 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -18,6 +20,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping({"/api/v1/auth", "/v1/auth", "/auth"})
 public class AuthController {
+
+  private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
   private final AppUserRepository userRepository;
   private final EmailOtpService emailOtpService;
@@ -121,13 +125,31 @@ public class AuthController {
       throw new ApiException(HttpStatus.UNAUTHORIZED, "Google ID token is required.");
     }
 
-    GoogleTokenVerifierService.GoogleUser googleUser = googleTokenVerifierService.verify(rawToken);
+    String tokenPreview = rawToken.substring(0, Math.min(50, rawToken.length()));
+    log.info("socialLogin: beginning Google ID token verification for provider={}, token(first50)={}...",
+        prov, tokenPreview);
+
+    GoogleTokenVerifierService.GoogleUser googleUser;
+    try {
+      googleUser = googleTokenVerifierService.verify(rawToken);
+      log.info("socialLogin: token verification succeeded for token(first50)={}...", tokenPreview);
+    } catch (ApiException e) {
+      log.error("socialLogin: token verification failed for token(first50)={}.... reason: {}",
+          tokenPreview, e.getMessage());
+      throw e;
+    } catch (RuntimeException e) {
+      log.error("socialLogin: unexpected exception during token verification for token(first50)={}.... {}",
+          tokenPreview, e.toString(), e);
+      throw e;
+    }
 
     String email = (request != null && request.email() != null && !request.email().isBlank())
         ? request.email().trim().toLowerCase()
         : googleUser.email();
 
     if (email == null || email.isBlank() || !email.equalsIgnoreCase(googleUser.email())) {
+      log.warn("socialLogin: email mismatch/verification failure. requestEmail={}, googleUserEmail={}",
+          email, googleUser.email());
       throw new ApiException(HttpStatus.UNAUTHORIZED, "Google account email could not be verified.");
     }
 
@@ -157,6 +179,7 @@ public class AuthController {
     entity.setPhotoUrl(photo);
     userRepository.save(entity);
 
+    log.info("socialLogin: authentication successful for email={}, uid={}", email, uid);
     return processUserLogin(uid, email, entity.getDisplayName(), entity.getPhotoUrl());
   }
 
