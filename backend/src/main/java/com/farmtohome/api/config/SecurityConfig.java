@@ -1,14 +1,8 @@
 package com.farmtohome.api.config;
 
 import com.farmtohome.api.auth.JwtAuthFilter;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Locale;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -17,17 +11,10 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.CorsFilter;
 
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
-
-  @Value("${app.cors-origins:${APP_CORS_ORIGINS:${CORS_ORIGINS:https://flutter-frontend-production-1590.up.railway.app,https://flutter-frontend-production-e8d6.up.railway.app,https://*.up.railway.app,https://*.railway.app,http://localhost:*,http://127.0.0.1:*}}}")
-  private String corsOrigins;
 
   @Bean
   SecurityFilterChain securityFilterChain(
@@ -35,7 +22,6 @@ public class SecurityConfig {
       JwtAuthFilter jwtAuthFilter) throws Exception {
     return http
         .csrf(csrf -> csrf.disable())
-        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
         .sessionManagement(session ->
             session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(auth -> auth
@@ -68,42 +54,5 @@ public class SecurityConfig {
     return username -> {
       throw new UsernameNotFoundException("Password login is not enabled on this API.");
     };
-  }
-
-  @Bean
-  CorsConfigurationSource corsConfigurationSource() {
-    // Use a CorsConfiguration subclass that lower-cases the incoming Origin header before
-    // matching so that pattern matching against allowed origins is case-insensitive.
-    CorsConfiguration configuration = new CorsConfiguration() {
-      @Override
-      public String checkOrigin(String requestOrigin) {
-        if (requestOrigin == null) {
-          return null;
-        }
-        String matched = super.checkOrigin(requestOrigin.toLowerCase(Locale.ROOT));
-        // Preserve the caller's original casing in the Access-Control-Allow-Origin header
-        // while still matching case-insensitively against the configured patterns.
-        return matched == null ? null : requestOrigin;
-      }
-    };
-    List<String> origins = Arrays.stream(corsOrigins.split(","))
-        .map(String::trim)
-        .filter(value -> !value.isBlank())
-        .map(value -> value.toLowerCase(Locale.ROOT))
-        .toList();
-
-    configuration.setAllowedOriginPatterns(origins);
-    configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"));
-    configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Requested-With", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", "*"));
-    configuration.setExposedHeaders(List.of(
-        "Authorization", "Content-Type", "X-Total-Count", 
-        "Access-Control-Allow-Origin", "Access-Control-Allow-Credentials"
-    ));
-    configuration.setAllowCredentials(true);
-    configuration.setMaxAge(3600L);
-
-    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-    source.registerCorsConfiguration("/**", configuration);
-    return source;
   }
 }
