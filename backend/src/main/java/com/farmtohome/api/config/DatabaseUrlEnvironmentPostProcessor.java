@@ -60,7 +60,7 @@ public class DatabaseUrlEnvironmentPostProcessor implements EnvironmentPostProce
       } catch (Exception ignored) {
       }
     } else if (pgHost != null && !pgHost.trim().isEmpty() && pgDb != null && !pgDb.trim().isEmpty()) {
-      int port = 5432;
+      int port = 5434;
       if (pgPort != null && !pgPort.trim().isEmpty()) {
         try {
           port = Integer.parseInt(pgPort.trim());

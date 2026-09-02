@@ -83,7 +83,7 @@ if ($null -eq $flutterCommand) {
   throw 'Flutter command not found. Open a new terminal after configuring Flutter PATH.'
 }
 
-$env:DB_URL = 'jdbc:postgresql://localhost:5432/farm_to_home'
+$env:DB_URL = 'jdbc:postgresql://localhost:5434/farm_to_home'
 $env:DB_USERNAME = 'postgres'
 $env:DB_PASSWORD = $DbPassword
 $env:FIREBASE_PROJECT_ID = 'farm-to-home-8c520'

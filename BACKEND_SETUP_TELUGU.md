@@ -41,7 +41,7 @@ Windows PowerShell open చేసి ఈ commands one by one run చేయి. `
 
 ```powershell
 cd C:\Users\dell\StudioProjects\farm_to_home_app\backend
-$env:DB_URL="jdbc:postgresql://localhost:5432/farm_to_home"
+$env:DB_URL="jdbc:postgresql://localhost:5434/farm_to_home"
 $env:DB_USERNAME="postgres"
 $env:DB_PASSWORD="YOUR_POSTGRES_PASSWORD"
 $env:FIREBASE_PROJECT_ID="farm-to-home-8c520"
