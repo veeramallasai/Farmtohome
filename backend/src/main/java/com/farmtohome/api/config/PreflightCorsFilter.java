@@ -27,11 +27,12 @@ public class PreflightCorsFilter extends OncePerRequestFilter {
     private final List<String> allowedOriginPatterns;
 
     public PreflightCorsFilter(
-            @Value("${app.cors-origins:https://flutter-frontend-production-1590.up.railway.app,https://flutter-frontend-production-e8d6.up.railway.app,https://*.up.railway.app,https://*.railway.app,http://localhost:*,http://127.0.0.1:*,*}")
+            @Value("${app.cors-origins:${APP_CORS_ORIGINS:${CORS_ORIGINS:https://flutter-frontend-production-1590.up.railway.app,https://flutter-frontend-production-e8d6.up.railway.app,https://*.up.railway.app,https://*.railway.app,http://localhost:*,http://127.0.0.1:*}}}")
             String corsOrigins) {
         this.allowedOriginPatterns = Arrays.stream(corsOrigins.split(","))
                 .map(String::trim)
                 .filter(value -> !value.isBlank())
+                .map(value -> value.toLowerCase(java.util.Locale.ROOT))
                 .toList();
     }
 
@@ -61,7 +62,8 @@ public class PreflightCorsFilter extends OncePerRequestFilter {
     }
 
     private boolean isAllowedOrigin(String origin) {
-        return allowedOriginPatterns.stream().anyMatch(pattern -> matches(pattern, origin));
+        String normalizedOrigin = origin.toLowerCase(java.util.Locale.ROOT);
+        return allowedOriginPatterns.stream().anyMatch(pattern -> matches(pattern, normalizedOrigin));
     }
 
     private boolean matches(String pattern, String origin) {
@@ -77,7 +79,7 @@ public class PreflightCorsFilter extends OncePerRequestFilter {
             sb.append(java.util.regex.Pattern.quote(parts[i]));
         }
         sb.append("$");
-        return origin.matches(sb.toString());
+        return origin.matches(sb.toString().toLowerCase(java.util.Locale.ROOT));
     }
 }
 
