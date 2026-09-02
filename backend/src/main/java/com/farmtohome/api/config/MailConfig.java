@@ -19,10 +19,10 @@ public class MailConfig {
   @Bean
   @Primary
   public JavaMailSender javaMailSender(
-      @Value("${spring.mail.host:${SPRING_MAIL_HOST:${MAIL_HOST:smtp.gmail.com}}}") String host,
-      @Value("${spring.mail.port:${SPRING_MAIL_PORT:${MAIL_PORT:465}}}") String portStr,
-      @Value("${spring.mail.username:${SPRING_MAIL_USERNAME:${MAIL_USERNAME:${APP_MAIL_FROM:${MAIL_FROM:veeramallasaipichaiah456@gmail.com}}}}}") String username,
-      @Value("${spring.mail.password:${SPRING_MAIL_PASSWORD:${MAIL_PASSWORD:hinnvjmxxziliiim}}}") String password) {
+      @Value("${SPRING_MAIL_HOST:${MAIL_HOST:smtp.gmail.com}}") String host,
+      @Value("${SPRING_MAIL_PORT:${MAIL_PORT:465}}") String portStr,
+      @Value("${SPRING_MAIL_USERNAME:${MAIL_USERNAME:${APP_MAIL_FROM:${MAIL_FROM:veeramallasaipichaiah456@gmail.com}}}}") String username,
+      @Value("${SPRING_MAIL_PASSWORD:${MAIL_PASSWORD:hinnvjmxxziliiim}}") String password) {
 
     int port = 465;
     try {

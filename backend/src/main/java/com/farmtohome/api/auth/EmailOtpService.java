@@ -43,11 +43,11 @@ public class EmailOtpService {
   public EmailOtpService(
       JdbcTemplate jdbc,
       JavaMailSender mailSender,
-      @Value("${app.mail-from:${MAIL_FROM:${spring.mail.username:${SPRING_MAIL_USERNAME:veeramallasaipichaiah456@gmail.com}}}}") String mailFrom,
-      @Value("${spring.mail.host:${SPRING_MAIL_HOST:${MAIL_HOST:smtp.gmail.com}}}") String mailHost,
-      @Value("${spring.mail.port:${SPRING_MAIL_PORT:${MAIL_PORT:587}}}") String mailPortStr,
-      @Value("${spring.mail.username:${SPRING_MAIL_USERNAME:${MAIL_USERNAME:${APP_MAIL_FROM:${MAIL_FROM:veeramallasaipichaiah456@gmail.com}}}}}") String mailUsername,
-      @Value("${spring.mail.password:${SPRING_MAIL_PASSWORD:${MAIL_PASSWORD:hinnvjmxxziliiim}}}") String mailPassword,
+      @Value("${app.mail-from:${MAIL_FROM:${SPRING_MAIL_USERNAME:veeramallasaipichaiah456@gmail.com}}}") String mailFrom,
+      @Value("${SPRING_MAIL_HOST:${MAIL_HOST:smtp.gmail.com}}") String mailHost,
+      @Value("${SPRING_MAIL_PORT:${MAIL_PORT:587}}") String mailPortStr,
+      @Value("${SPRING_MAIL_USERNAME:${MAIL_USERNAME:${APP_MAIL_FROM:${MAIL_FROM:veeramallasaipichaiah456@gmail.com}}}}") String mailUsername,
+      @Value("${SPRING_MAIL_PASSWORD:${MAIL_PASSWORD:hinnvjmxxziliiim}}") String mailPassword,
       @Value("${RESEND_API_KEY:${MAIL_RESEND_API_KEY:}}") String resendApiKey,
       @Value("${RESEND_FROM_EMAIL:${MAIL_RESEND_FROM_EMAIL:${app.resend-from-email:onboarding@resend.dev}}}") String resendFromEmail,
       @Value("${SENDGRID_API_KEY:${MAIL_SENDGRID_API_KEY:}}") String sendgridApiKey) {

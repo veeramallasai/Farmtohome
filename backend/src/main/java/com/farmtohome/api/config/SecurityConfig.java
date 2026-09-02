@@ -25,6 +25,9 @@ import org.springframework.web.filter.CorsFilter;
 @EnableMethodSecurity
 public class SecurityConfig {
 
+  @Value("${app.cors-origins:https://flutter-frontend-production-1590.up.railway.app,https://flutter-frontend-production-e8d6.up.railway.app,https://*.up.railway.app,https://*.railway.app,http://localhost:*,http://127.0.0.1:*,*}")
+  private String corsOrigins;
+
   @Bean
   SecurityFilterChain securityFilterChain(
       HttpSecurity http,
@@ -69,14 +72,12 @@ public class SecurityConfig {
   @Bean
   CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration configuration = new CorsConfiguration();
-    // Allow origins using patterns (compatible with allowCredentials = true)
-    configuration.addAllowedOriginPattern("https://flutter-frontend-production-e8d6.up.railway.app");
-    configuration.addAllowedOriginPattern("https://*.up.railway.app");
-    configuration.addAllowedOriginPattern("https://*.railway.app");
-    configuration.addAllowedOriginPattern("http://localhost:*");
-    configuration.addAllowedOriginPattern("http://127.0.0.1:*");
-    configuration.addAllowedOriginPattern("*");
-    
+    List<String> origins = Arrays.stream(corsOrigins.split(","))
+        .map(String::trim)
+        .filter(value -> !value.isBlank())
+        .toList();
+
+    configuration.setAllowedOriginPatterns(origins);
     configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"));
     configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Requested-With", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", "*"));
     configuration.setExposedHeaders(List.of(

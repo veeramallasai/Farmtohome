@@ -27,7 +27,7 @@ public class PreflightCorsFilter extends OncePerRequestFilter {
     private final List<String> allowedOriginPatterns;
 
     public PreflightCorsFilter(
-            @Value("${app.cors-origins:https://flutter-frontend-production-1590.up.railway.app,https://flutter-frontend-production-e8d6.up.railway.app,https://*.up.railway.app,https://*.railway.app,http://localhost:*,http://127.0.0.1:*}")
+            @Value("${app.cors-origins:https://flutter-frontend-production-1590.up.railway.app,https://flutter-frontend-production-e8d6.up.railway.app,https://*.up.railway.app,https://*.railway.app,http://localhost:*,http://127.0.0.1:*,*}")
             String corsOrigins) {
         this.allowedOriginPatterns = Arrays.stream(corsOrigins.split(","))
                 .map(String::trim)
@@ -67,8 +67,18 @@ public class PreflightCorsFilter extends OncePerRequestFilter {
     private boolean matches(String pattern, String origin) {
         if ("*".equals(pattern)) return true;
         if (pattern.equalsIgnoreCase(origin)) return true;
-        String regex = "^" + java.util.regex.Pattern.quote(pattern).replace("\\*", ".*") + "$";
-        return origin.matches(regex);
+
+        String[] parts = pattern.split("\\*", -1);
+        StringBuilder sb = new StringBuilder("^");
+        for (int i = 0; i < parts.length; i++) {
+            if (i > 0) {
+                sb.append(".*");
+            }
+            sb.append(java.util.regex.Pattern.quote(parts[i]));
+        }
+        sb.append("$");
+        return origin.matches(sb.toString());
     }
 }
+
 
