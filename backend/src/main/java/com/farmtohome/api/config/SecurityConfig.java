@@ -77,13 +77,10 @@ public class SecurityConfig {
         .filter(value -> !value.isBlank())
         .toList();
 
-    configuration.setAllowedOriginPatterns(origins);
+    configuration.addAllowedOriginPattern("*");
     configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"));
-    configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Requested-With", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", "*"));
-    configuration.setExposedHeaders(List.of(
-        "Authorization", "Content-Type", "X-Total-Count", 
-        "Access-Control-Allow-Origin", "Access-Control-Allow-Credentials"
-    ));
+    configuration.setAllowedHeaders(List.of("*"));
+    configuration.setExposedHeaders(List.of("*"));
     configuration.setAllowCredentials(true);
     configuration.setMaxAge(3600L);
 

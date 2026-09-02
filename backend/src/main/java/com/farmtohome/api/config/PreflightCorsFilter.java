@@ -38,12 +38,10 @@ public class PreflightCorsFilter extends OncePerRequestFilter {
             if (reqHeaders != null && !reqHeaders.isBlank()) {
                 response.setHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, reqHeaders);
             } else {
-                response.setHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS,
-                    "Authorization, Content-Type, Accept, X-Requested-With, Origin, Access-Control-Request-Method, Access-Control-Request-Headers, X-CSRF-Token, *");
+                response.setHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, "*");
             }
 
-            response.setHeader(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS,
-                "Authorization, Content-Type, X-Total-Count, Access-Control-Allow-Origin, Access-Control-Allow-Credentials");
+            response.setHeader(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, "*");
             response.setHeader(HttpHeaders.ACCESS_CONTROL_MAX_AGE, "3600");
         }
 
